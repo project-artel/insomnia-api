@@ -14,9 +14,9 @@ meta:
     stage_agent_ws_url 두 변수를 사용한다. 비밀값은 이 파일에 넣지 말고
     Insomnia private environment로 관리한다.
 
-    /extract는 `extract_source_url`(S3 presigned GET URL)을 참조하지만 이 파일은
-    그 값을 정의하지 않는다. 서명이 담긴 시한부 자격증명이므로 각자 private
-    environment에 채운다 — 요청 Docs 패널의 발급 커맨드 참고.
+    /extract의 `extract_source_url` 기본값은 공개해 둔 테스트 픽스처 하나를 가리키므로
+    pull 직후 바로 실행된다. 다른 문서로 시험하려면 presigned URL을 private
+    environment에 넣어 덮어쓴다 — 서명값은 이 파일에 커밋하지 않는다.
 collection:
   - url: "{{ _.stage_agent_base_url }}/health"
     name: /health — 헬스체크
@@ -164,15 +164,21 @@ collection:
 
         **동작**: `source_url`을 httpx로 직접 GET해 문서 바이트를 받고, 확장자/Content-Type으로 로더를 골라(pdf는 pdfplumber, txt·md는 디코드) 평문으로 만든 뒤 LLM에 넘겨 구조화된 `game_context`를 뽑는다.
 
-        **⚠️ source_url은 presigned GET URL이어야 한다.** Agent Server는 AWS 자격증명을 갖지 않고 익명 GET만 한다. 서명은 URL 쿼리스트링(`X-Amz-Signature` 등)에 들어 있고, S3는 그 서명을 만든 IAM 주체의 권한으로 접근을 허용한다. 서명이 없는 평문 S3 URL을 넣으면 버킷이 비공개이므로 `403 AccessDenied` → 이 API는 `502`로 감싼다. 운영에서는 Orchestration이 `/extract` 호출 직전에 발급한다.
+        **⚠️ 운영에서 source_url은 presigned GET URL이어야 한다.** Agent Server는 AWS 자격증명을 갖지 않고 익명 GET만 한다. 서명은 URL 쿼리스트링(`X-Amz-Signature` 등)에 들어 있고, S3는 그 서명을 만든 IAM 주체의 권한으로 접근을 허용한다. 그래서 접근 권한은 서명하는 쪽(Orchestration)이 갖고, 호출 직전에 발급한다.
 
-        **테스트 준비**: presigned URL은 시한부 서명값이라 이 파일에 커밋하지 않는다. 아래로 발급해 개인 환경(private environment)의 `extract_source_url`에 넣는다.
+        버킷은 비공개이므로 서명 없는 평문 S3 URL은 `403 AccessDenied`가 되고 이 API는 `502`로 감싼다. 아래 기본값만 예외로, 그 객체 하나에 한해 버킷 정책으로 공개돼 있다.
+
+        **테스트**: `extract_source_url` 기본값은 그냥 실행하면 된다. 버킷 정책으로 이 객체 하나만 공개해 둔 고정 픽스처(9.5MB PDF)라 서명 없이 받아진다. 버킷의 나머지는 비공개다.
+
+        다른 문서로 시험하려면 presigned URL을 직접 발급해 개인 환경(private environment)의 `extract_source_url`을 덮어쓴다. 서명값이므로 이 파일에는 커밋하지 않는다.
 
         ```
         aws s3 presign "s3://<bucket>/<key>" --expires-in 3600 --region ap-northeast-2
         ```
 
-        `filename`은 URL과 별개로 포맷 판별 힌트이므로, presign한 객체와 같은 확장자를 유지한다.
+        Orchestration의 `GET /api/projects/{projectId}/documents/{documentId}/download-url`도 같은 URL을 발급한다(TTL 5분). 자격증명이 없는 배포에서는 서명 없는 URL이 나오므로, 받은 값에 `X-Amz-Signature`가 있는지 확인한다.
+
+        `filename`은 URL과 별개로 포맷 판별 힌트다. 다른 문서를 넣을 때 확장자를 함께 바꾼다.
 
         **Request**
         - `source_url` (string, 필수): presigned GET URL
@@ -193,7 +199,7 @@ collection:
       text: |-
         {
           "source_url": "{{ _.extract_source_url }}",
-          "filename": "REPLACE_FILENAME.pdf",
+          "filename": "27760374-f913-481c-a2ab-27835cbe5c41.pdf",
           "model": "openai/gpt-4o-mini"
         }
     headers:
@@ -285,6 +291,10 @@ environments:
   data:
     stage_agent_base_url: https://stage-agent.artel.kr
     stage_agent_ws_url: wss://stage-agent.artel.kr
+    # /extract 테스트용 고정 픽스처. 이 객체 하나만 버킷 정책으로 공개돼 있어 서명 없이
+    # 받아진다(9.5MB PDF). 운영 경로는 Orchestration이 호출 직전에 발급하는 presigned
+    # URL이며, 그 값은 서명이 담긴 자격증명이므로 이 파일에 두지 않는다.
+    extract_source_url: https://artel-qa-agent-asm2026-s3-bucket.s3.ap-northeast-2.amazonaws.com/projects/1/documents/62e14a26-bb57-4feb-845c-e4a789b697dd/27760374-f913-481c-a2ab-27835cbe5c41.pdf
   subEnvironments:
     - name: local
       meta:
