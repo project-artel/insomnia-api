@@ -398,6 +398,136 @@ collection:
     authentication:
       type: bearer
       token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt 'Scenario ID', 'myScenarioId', 'Scenario ID', '', 'myScenarioId' %}"
+    name: 테스트 시나리오 자동저장(canvas 편집)
+    meta:
+      id: req_orch_scenario_update
+      created: 1784859827000
+      modified: 1784859827000
+      isPrivate: false
+      description: |-
+        **호출 주체**: FE 대시보드(React) → Orchestration
+
+        **동작**: Agent를 거치지 않은 순수 canvas 편집(드래그앤드롭 순서변경·필드 수정)을 payload에 저장한다(last-write-wins). FE는 편집을 debounce로 묶어 호출한다.
+
+        **Request**
+        - `draft` (ScenarioDraft): canvas의 현재 전체 상태
+
+        **Response**
+        - `200`: `ScenarioResponse { testScenarioId, projectId, payload }` — 저장된 상태 반환
+        - `404`: 비참여자/미존재
+
+        **활용**: 반환 payload로 FE 로컬 draft ↔ DB 정합성을 맞춘다(dirty 해제).
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "draft": {
+            "title": "튜토리얼 진행 검증",
+            "description": "메인→인게임",
+            "steps": [
+              {"step": 1, "title": "게임 시작", "state": "메인 메뉴", "action": "시작 버튼 클릭", "expected": "인게임 진입"}
+            ]
+          }
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt 'Scenario ID', 'myScenarioId', 'Scenario ID', '', 'myScenarioId' %}/approve"
+    name: 테스트 시나리오 승인(확정)
+    meta:
+      id: req_orch_scenario_approve
+      created: 1784859828000
+      modified: 1784859828000
+      isPrivate: false
+      description: |-
+        **호출 주체**: FE 대시보드(React) → Orchestration
+
+        **동작**: 시나리오를 확정한다. body에 draft가 있으면 payload로 저장하고 Agent 세션(WS)과 SSE 스트림을 닫는다(SSE로 `closed` 이벤트). **채팅 내역과 시나리오는 그대로 남는다(부산물 삭제 없음).**
+
+        **Request**
+        - `draft` (ScenarioDraft, optional): 확정할 최종본. 생략 시 마지막 저장 payload를 그대로 확정
+
+        **Response**
+        - `200`: `"승인 완료"`
+        - `404`: 비참여자/미존재
+
+        **활용**: FE Approve 버튼. 확정 후 편집 화면을 정리하고 프로젝트로 복귀.
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "draft": {
+            "title": "최종본",
+            "description": "확정된 시나리오",
+            "steps": [
+              {"step": 1, "title": "게임 시작", "state": "메인 메뉴", "action": "시작 버튼 클릭", "expected": "인게임 진입"}
+            ]
+          }
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', '1' %}/test-scenario"
+    name: 프로젝트 시나리오 목록 조회
+    meta:
+      id: req_orch_scenario_list
+      created: 1784859829000
+      modified: 1784859829000
+      isPrivate: false
+      description: |-
+        **호출 주체**: FE 대시보드(React) → Orchestration
+
+        **동작**: 프로젝트에 속한 시나리오 목록(요약)을 조회한다. 목록 화면 렌더용으로 payload 전체 대신 제목만 담는다.
+
+        **Request**
+        - `[path] projectId` (Long): 소속 프로젝트
+
+        **Response**
+        - `200`: `{ items: ScenarioSummary[] }` — `ScenarioSummary { testScenarioId, projectId, title, createdAt, updatedAt }`
+        - `404`: 비참여자/프로젝트 없음
+
+        **활용**: 목록 화면에서 items를 그리고, 클릭 시 편집 화면으로 이동.
+    method: GET
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', '1' %}/test-scenario/{% prompt 'Scenario ID', 'myScenarioId', 'Scenario ID', '', 'myScenarioId' %}"
+    name: 프로젝트 시나리오 단건 조회
+    meta:
+      id: req_orch_scenario_get_in_project
+      created: 1784859830000
+      modified: 1784859830000
+      isPrivate: false
+      description: |-
+        **호출 주체**: FE 대시보드(React) → Orchestration
+
+        **동작**: 프로젝트 스코프로 시나리오 단건의 payload를 조회한다.
+
+        **Request**
+        - `[path] projectId` (Long), `[path] testScenarioId` (Long)
+
+        **Response**
+        - `200`: `ScenarioResponse { testScenarioId, projectId, payload: ScenarioDraft }`
+        - `404`: 미존재/비참여자/projectId 불일치
+
+        **활용**: 재방문 시 canvas 렌더 복원.
+    method: GET
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
 cookieJar:
   name: Default Jar
   meta:
