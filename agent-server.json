@@ -1,0 +1,148 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-07-24T03:52:36.633Z",
+  "__export_source": "mcp-insomnia",
+  "resources": [
+    {
+      "_id": "wrk_agent_server",
+      "_type": "workspace",
+      "name": "agent-server",
+      "description": ""
+    },
+    {
+      "_id": "fld_agent_health",
+      "_type": "request_group",
+      "name": "Health",
+      "description": "서버 상태 확인",
+      "parentId": "wrk_agent_server"
+    },
+    {
+      "_id": "fld_agent_extract",
+      "_type": "request_group",
+      "name": "Extract",
+      "description": "문서 텍스트 추출",
+      "parentId": "wrk_agent_server"
+    },
+    {
+      "_id": "fld_agent_session",
+      "_type": "request_group",
+      "name": "Session",
+      "description": "시나리오 세션",
+      "parentId": "wrk_agent_server"
+    },
+    {
+      "_id": "req_b84c5bd10e2042869417e8aade4ea781",
+      "_type": "request",
+      "name": "/health — 헬스체크",
+      "url": "{{ _.stage_agent_base_url }}/health",
+      "method": "GET",
+      "description": "**호출 주체**: 로드밸런서·컨테이너 오케스트레이터의 liveness probe, 배포 후 수동 확인\n\n**동작**: 의존성(Redis, OpenRouter)을 확인하지 않고 프로세스가 살아 있는지만 답한다. 200이 떠도 세션 API가 정상이라는 보장은 아니다.\n\n**Response**\n- `200`: `{ \"status\": \"ok\" }`\n\n**활용**: 배포 직후 이 요청부터 보내 base_url과 환경 선택(stage/local)이 맞는지 확인한다.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_agent_health"
+    },
+    {
+      "_id": "req_c7f077298de149d28c266bdd0a9b4357",
+      "_type": "request",
+      "name": "/extract — 기획서에서 game_context 추출",
+      "url": "{{ _.stage_agent_base_url }}/extract",
+      "method": "POST",
+      "description": "**호출 주체**: Orchestration → Agent Server (무상태, 세션 없음)\n\n**동작**: `source_url`을 httpx로 직접 GET해 문서 바이트를 받고, 확장자/Content-Type으로 로더를 골라(pdf는 pdfplumber, txt·md는 디코드) 평문으로 만든 뒤 LLM에 넘겨 구조화된 `game_context`를 뽑는다.\n\n**⚠️ 운영에서 source_url은 presigned GET URL이어야 한다.** Agent Server는 AWS 자격증명을 갖지 않고 익명 GET만 한다. 서명은 URL 쿼리스트링(`X-Amz-Signature` 등)에 들어 있고, S3는 그 서명을 만든 IAM 주체의 권한으로 접근을 허용한다. 그래서 접근 권한은 서명하는 쪽(Orchestration)이 갖고, 호출 직전에 발급한다.\n\n버킷은 비공개이므로 서명 없는 평문 S3 URL은 `403 AccessDenied`가 되고 이 API는 `502`로 감싼다. 아래 기본값만 예외로, 그 객체 하나에 한해 버킷 정책으로 공개돼 있다.\n\n**테스트**: `extract_source_url` 기본값은 그냥 실행하면 된다. 버킷 정책으로 이 객체 하나만 공개해 둔 고정 픽스처(9.5MB PDF)라 서명 없이 받아진다. 버킷의 나머지는 비공개다.\n\n다른 문서로 시험하려면 presigned URL을 직접 발급해 개인 환경(private environment)의 `extract_source_url`을 덮어쓴다. 서명값이므로 이 파일에는 커밋하지 않는다.\n\n```\naws s3 presign \"s3://<bucket>/<key>\" --expires-in 3600 --region ap-northeast-2\n```\n\nOrchestration의 `GET /api/projects/{projectId}/documents/{documentId}/download-url`도 같은 URL을 발급한다(TTL 5분). 자격증명이 없는 배포에서는 서명 없는 URL이 나오므로, 받은 값에 `X-Amz-Signature`가 있는지 확인한다.\n\n`filename`은 URL과 별개로 포맷 판별 힌트다. 다른 문서를 넣을 때 확장자를 함께 바꾼다.\n\n**Request**\n- `source_url` (string, 필수): presigned GET URL\n- `filename` (string, 필수): 포맷 판별용 파일명. `.pdf` / `.txt` / `.md` 지원\n- `model` (enum, 선택): 기본 `openai/gpt-4o-mini`. `openai/gpt-4o`, `anthropic/claude-sonnet-5`, `anthropic/claude-opus-4.8`, `google/gemini-2.5-flash`, `google/gemini-2.5-pro`, `google/gemma-4-31b-it:free`\n\n**Response**\n- `200`: `{ filename, game_context }`. `game_context`는 `overview`, `screens`, `mechanics`, `entities`, `progression`, `flows`, `glossary`, `misc` 8개 섹션 고정\n- `415`: 지원하지 않는 포맷\n- `422`: 추출 결과가 스키마 검증 실패\n- `502`: 문서 fetch 실패(서명 없음·만료·크기 초과·타임아웃) 또는 LLM 오류\n\n**활용**: 반환된 `game_context`를 Orchestration이 저장하고, 이후 시나리오 세션의 `game_context` 입력으로 재사용한다. 원본 PDF는 S3에 남고 presigned URL은 저장하지 않는다.",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"source_url\": \"{{ _.extract_source_url }}\",\n  \"filename\": \"27760374-f913-481c-a2ab-27835cbe5c41.pdf\",\n  \"model\": \"openai/gpt-4o-mini\"\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "parentId": "fld_agent_extract"
+    },
+    {
+      "_id": "req_7d5ab9224f184b338e9e2e7a12df2f3c",
+      "_type": "request",
+      "name": "/sessions — 세션 열기",
+      "url": "{{ _.stage_agent_base_url }}/sessions",
+      "method": "POST",
+      "description": "**호출 주체**: Orchestration → Agent Server. 사용자가 대시보드에서 시나리오 생성을 시작할 때.\n\n**동작**: 대화 상태(컨텍스트·히스토리)를 Redis에 만들고 `session_id`를 돌려준다. 이 요청 자체는 LLM을 호출하지 않는다 — 첫 생성은 WS 연결 시점에 일어난다. 세션 TTL은 1시간이고 히스토리는 최근 10턴까지 유지된다.\n\n**Request**\n- `user_input` (string, 필수): 만들고 싶은 시나리오에 대한 자연어 지시\n- `unity_context` (object, 선택): Unity 런타임에서 수집한 현재 게임 상태. 기본 `{}`\n- `game_context` (object, 선택): 기획서에서 추출한 게임 지식. `POST /extract` 응답의 `game_context`를 그대로 넣는다. 기본 `{}`\n- `model` (enum, 선택): 기본 `openai/gpt-4o-mini`. `openai/gpt-4o`, `anthropic/claude-sonnet-5`, `anthropic/claude-opus-4.8`, `google/gemini-2.5-flash`, `google/gemini-2.5-pro`, `google/gemma-4-31b-it:free`\n\n**Response**\n- `200`: `{ session_id }`\n- `422`: body 검증 실패\n\n**활용**: 반환된 `session_id`로 WS `/sessions/{session_id}`에 연결해야 실제 시나리오가 생성된다. 이 컬렉션의 다른 요청들은 응답 체이닝으로 이 값을 자동 참조하므로, 이 요청을 먼저 한 번 실행해 두면 된다.",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"user_input\": \"로그인 화면에서 잘못된 비밀번호를 입력하는 시나리오를 만들어줘\",\n  \"unity_context\": {},\n  \"game_context\": {},\n  \"model\": \"openai/gpt-4o-mini\"\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json",
+          "disabled": false
+        }
+      ],
+      "parameters": [],
+      "parentId": "fld_agent_session"
+    },
+    {
+      "_id": "req_61b7e8a85810422eb2d2c19b3890eff5",
+      "_type": "request",
+      "name": "/sessions/{session_id}/approve — 승인·종료",
+      "url": "{{ _.stage_agent_base_url }}/sessions/{% response 'body', 'req_7d5ab9224f184b338e9e2e7a12df2f3c', 'b64::JC5zZXNzaW9uX2lk::46b', 'never', 60 %}/approve",
+      "method": "POST",
+      "description": "**호출 주체**: Orchestration → Agent Server. 사용자가 생성된 시나리오를 채택했을 때.\n\n**동작**: 세션을 Redis에서 지우고 종료한다. **서버 동작은 `/decline`과 완전히 동일하다** — Agent Server는 자기가 소유한 세션만 정리하고, 승인/거절의 의미(시나리오 저장 여부)는 Orchestration이 판단한다. 그래서 이 엔드포인트는 draft 내용을 받지도, 저장하지도 않는다. 채택할 시나리오는 WS의 마지막 `result` 이벤트에서 Orchestration이 이미 갖고 있다.\n\n**Request**\n- 경로의 `session_id`만. body 없음. (이 요청은 `POST /sessions` 응답에서 자동으로 채워진다)\n\n**Response**\n- `200`: `{ \"ok\": true }`\n\n**활용**: 호출 후 해당 `session_id`는 무효가 된다. 다시 WS로 연결하면 `session_expired` 이벤트를 받는다.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_agent_session"
+    },
+    {
+      "_id": "req_1350e17a0fcc4705b0c65002832f977b",
+      "_type": "request",
+      "name": "/sessions/{session_id}/decline — 거절·종료",
+      "url": "{{ _.stage_agent_base_url }}/sessions/{% response 'body', 'req_7d5ab9224f184b338e9e2e7a12df2f3c', 'b64::JC5zZXNzaW9uX2lk::46b', 'never', 60 %}/decline",
+      "method": "POST",
+      "description": "**호출 주체**: Orchestration → Agent Server. 사용자가 생성된 시나리오를 버렸을 때.\n\n**동작**: 세션을 Redis에서 지우고 종료한다. **서버 동작은 `/approve`와 완전히 동일하다** — 두 엔드포인트가 나뉜 것은 Orchestration 쪽 의도를 호출부에 남기기 위해서이고, Agent Server는 어느 쪽이든 세션 정리만 한다.\n\n**Request**\n- 경로의 `session_id`만. body 없음. (이 요청은 `POST /sessions` 응답에서 자동으로 채워진다)\n\n**Response**\n- `200`: `{ \"ok\": true }`\n\n**활용**: 호출 후 해당 `session_id`는 무효가 된다. 다시 만들려면 `POST /sessions`부터 시작한다.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_agent_session"
+    },
+    {
+      "_id": "ws-req_ddf5b310e09648fb92147dcde3e73631",
+      "_type": "request",
+      "name": "/sessions/{session_id} — 시나리오 스트림",
+      "url": "{{ _.stage_agent_ws_url }}/sessions/{% response 'body', 'req_7d5ab9224f184b338e9e2e7a12df2f3c', 'b64::JC5zZXNzaW9uX2lk::46b', 'never', 60 %}",
+      "method": "GET",
+      "description": "**호출 주체**: Orchestration → Agent Server (WebSocket). 시나리오를 대화로 다듬는 구간 전체를 담당한다.\n\n**동작**: 연결되면 서버가 먼저 세션에 저장된 최초 `user_input`으로 시나리오를 생성해 `result`를 밀어준다. 이후로는 클라이언트가 `turn`을 보낼 때마다 직전 draft를 고쳐 새 `result`를 돌려주는 왕복이다. 히스토리는 최근 10턴까지만 유지된다.\n\n**흐름**\n1. `POST /sessions`로 `session_id` 획득\n2. 이 URL로 WS 연결 → 서버가 첫 `result` 전송 (요청 없이 먼저 온다)\n3. `turn` 전송 → `result` 수신, 만족할 때까지 반복\n4. `close` 전송 또는 HTTP `/approve`·`/decline`으로 종료\n\n**클라이언트 → 서버**\n\n`turn` — 수정 요청:\n```json\n{\n  \"type\": \"turn\",\n  \"user_input\": \"2단계를 더 구체적으로 바꿔줘\",\n  \"draft\": {\n    \"title\": \"로그인 실패 시나리오\",\n    \"description\": \"잘못된 비밀번호 입력 흐름\",\n    \"steps\": [\n      {\"step\": 1, \"title\": \"로그인 화면 진입\", \"state\": \"앱 실행됨\", \"action\": \"로그인 버튼 탭\", \"expected\": \"로그인 폼 표시\"}\n    ]\n  },\n  \"model\": \"openai/gpt-4o-mini\"\n}\n```\n`draft`와 `model`은 선택. **`draft`는 웬만하면 넣는 것이 좋다** — 서버가 프롬프트에 복원하는 히스토리는 텍스트 메시지뿐이고 이전 시나리오 구조는 재생하지 않으므로, 생략하면 모델이 고칠 대상을 구조적으로 보지 못한 채 답한다. 직전 `result`의 `scenario`를 그대로 넣으면 된다. `steps`의 `step`은 1부터 연속이어야 한다. `model`을 지정하면 그 세션에 계속 유지된다.\n\n`close` — 세션 정리 후 소켓 종료:\n```json\n{\"type\": \"close\"}\n```\n\n**서버 → 클라이언트**\n- `result`: `{ \"type\":\"result\", \"message\":\"...\", \"scenario\":{ \"title\",\"description\",\"steps\" } }`\n- `closed`: `{ \"type\":\"closed\" }` — `close`에 대한 응답. 직후 소켓이 닫힌다\n- `error`: `{ \"type\":\"error\", \"code\":\"...\", \"detail\":\"...\" }`\n\n**error code**\n- `session_expired`: 세션 없음/만료. **소켓이 닫힌다** — `POST /sessions`부터 다시\n- `bad_request`: `turn` 메시지 스키마 위반. 연결 유지, 재전송 가능\n- `validation_error`: LLM 결과가 시나리오 스키마 검증 실패. 연결 유지\n- `llm_error`: OpenRouter 오류. 연결 유지\n\n**활용**: 마지막으로 받은 `result`의 `scenario`가 채택 대상이다. Agent Server는 이를 저장하지 않으므로 Orchestration이 들고 있다가 `/approve` 시점에 자기 DB에 기록한다.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_agent_session"
+    },
+    {
+      "_id": "env_ec4fdad312d548b99e21aa4f4242f465",
+      "_type": "environment",
+      "parentId": "wrk_agent_server",
+      "name": "Base Environment",
+      "description": "Base environment variables",
+      "data": {
+        "stage_agent_base_url": "https://stage-agent.artel.kr"
+      },
+      "modified": 1784865146557,
+      "created": 1784865146557
+    },
+    {
+      "_id": "env_80841d98669c4f599507103c365ab52f",
+      "_type": "environment",
+      "parentId": "wrk_agent_server",
+      "name": "Base Environment",
+      "description": "Base environment variables",
+      "data": {
+        "stage_agent_ws_url": "wss://stage-agent.artel.kr"
+      },
+      "modified": 1784865147567,
+      "created": 1784865147567
+    }
+  ]
+}

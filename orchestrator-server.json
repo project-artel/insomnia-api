@@ -1,0 +1,551 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-07-24T03:52:37.643Z",
+  "__export_source": "mcp-insomnia",
+  "resources": [
+    {
+      "_id": "wrk_orch_server",
+      "_type": "workspace",
+      "name": "orchestrator-server",
+      "description": ""
+    },
+    {
+      "_id": "fld_orch_auth",
+      "_type": "request_group",
+      "name": "Auth",
+      "description": "OAuth 로그인/JWT 세션/사용자 정보",
+      "parentId": "wrk_orch_server"
+    },
+    {
+      "_id": "fld_orch_project",
+      "_type": "request_group",
+      "name": "Project",
+      "description": "프로젝트 CRUD",
+      "parentId": "wrk_orch_server"
+    },
+    {
+      "_id": "fld_orch_document",
+      "_type": "request_group",
+      "name": "Document",
+      "description": "기획서(GDD)",
+      "parentId": "wrk_orch_server"
+    },
+    {
+      "_id": "fld_orch_game_build",
+      "_type": "request_group",
+      "name": "Game Build",
+      "description": "SDK 보고 게임 버전",
+      "parentId": "wrk_orch_server"
+    },
+    {
+      "_id": "fld_orch_game_instance",
+      "_type": "request_group",
+      "name": "Game Instance",
+      "description": "SDK 설치본 CRUD",
+      "parentId": "wrk_orch_server"
+    },
+    {
+      "_id": "fld_orch_sdk",
+      "_type": "request_group",
+      "name": "SDK",
+      "description": "SDK 등록/액션 전달",
+      "parentId": "wrk_orch_server"
+    },
+    {
+      "_id": "fld_orch_scenario",
+      "_type": "request_group",
+      "name": "TestScenario",
+      "description": "QA 시나리오",
+      "parentId": "wrk_orch_server"
+    },
+    {
+      "_id": "req_orch_oauth_start",
+      "_type": "request",
+      "name": "OAuth 로그인 시작",
+      "url": "{{ _.stage_orch_base_url }}/oauth2/authorization/github",
+      "method": "GET",
+      "description": "GitHub OAuth 로그인 시작. 브라우저 리다이렉트.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_orch_auth"
+    },
+    {
+      "_id": "req_orch_oauth_callback",
+      "_type": "request",
+      "name": "OAuth 콜백",
+      "url": "{{ _.stage_orch_base_url }}/login/oauth2/code/github",
+      "method": "GET",
+      "description": "GitHub OAuth 콜백. code·state 쿼리 파라미터로 JWT 교환.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_orch_auth"
+    },
+    {
+      "_id": "req_orch_auth_me",
+      "_type": "request",
+      "name": "내 정보",
+      "url": "{{ _.stage_orch_base_url }}/api/auth/me",
+      "method": "GET",
+      "description": "현재 JWT 사용자 정보. 401 Unauthorized 가능.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_orch_auth"
+    },
+    {
+      "_id": "req_orch_auth_logout",
+      "_type": "request",
+      "name": "로그아웃",
+      "url": "{{ _.stage_orch_base_url }}/api/auth/logout",
+      "method": "POST",
+      "description": "JWT 쿠키 삭제.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_orch_auth"
+    },
+    {
+      "_id": "req_orch_project_list",
+      "_type": "request",
+      "name": "프로젝트 목록 조회",
+      "url": "{{ _.stage_orch_base_url }}/api/projects",
+      "method": "GET",
+      "description": "내 프로젝트 목록.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_orch_project"
+    },
+    {
+      "_id": "req_orch_project_create",
+      "_type": "request",
+      "name": "프로젝트 등록",
+      "url": "{{ _.stage_orch_base_url }}/api/projects",
+      "method": "POST",
+      "description": "새 프로젝트 등록.",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"name\": \"My Game\", \"description\": \"테스트 게임 프로젝트\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "parentId": "fld_orch_project"
+    },
+    {
+      "_id": "req_orch_project_get",
+      "_type": "request",
+      "name": "프로젝트 단일 조회",
+      "url": "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}",
+      "method": "GET",
+      "description": "프로젝트 상세.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_orch_project"
+    },
+    {
+      "_id": "req_orch_project_patch",
+      "_type": "request",
+      "name": "프로젝트 수정",
+      "url": "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}",
+      "method": "PATCH",
+      "description": "프로젝트 이름/설명 수정.",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"name\": \"Renamed Project\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "parentId": "fld_orch_project"
+    },
+    {
+      "_id": "req_orch_project_delete",
+      "_type": "request",
+      "name": "프로젝트 삭제",
+      "url": "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}",
+      "method": "DELETE",
+      "description": "프로젝트 삭제. 204 No Content.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_orch_project"
+    },
+    {
+      "_id": "req_orch_doc_upload",
+      "_type": "request",
+      "name": "기획서 업로드 URL 발급",
+      "url": "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/documents/upload-url",
+      "method": "POST",
+      "description": "S3 presigned URL 발급.",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"fileName\": \"GDD_v1.pdf\", \"contentType\": \"application/pdf\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "parentId": "fld_orch_document"
+    },
+    {
+      "_id": "req_orch_doc_upload_confirm",
+      "_type": "request",
+      "name": "문서 업로드",
+      "url": "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/documents",
+      "method": "POST",
+      "description": "S3 업로드 후 문서 등록.",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"fileName\": \"GDD_v1.pdf\", \"s3Key\": \"projects/1/documents/abc-123/GDD_v1.pdf\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "parentId": "fld_orch_document"
+    },
+    {
+      "_id": "req_orch_doc_list",
+      "_type": "request",
+      "name": "기획서 이력 조회",
+      "url": "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/documents",
+      "method": "GET",
+      "description": "프로젝트 문서 목록.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_orch_document"
+    },
+    {
+      "_id": "req_orch_doc_download",
+      "_type": "request",
+      "name": "기획서 다운로드 URL 발급",
+      "url": "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/documents/{% prompt 'Document ID', 'myDocId', 'Document ID', '', 'myDocId' %}/download-url",
+      "method": "GET",
+      "description": "S3 presigned 다운로드 URL.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_orch_document"
+    },
+    {
+      "_id": "req_orch_build_list",
+      "_type": "request",
+      "name": "게임 빌드 목록",
+      "url": "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/game-builds",
+      "method": "GET",
+      "description": "SDK가 보고한 게임 버전 목록.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_orch_game_build"
+    },
+    {
+      "_id": "req_orch_build_patch",
+      "_type": "request",
+      "name": "게임 빌드 설명 수정",
+      "url": "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/game-builds/{% prompt 'Build ID', 'myBuildId', 'Build ID', '', 'myBuildId' %}",
+      "method": "PATCH",
+      "description": "label·notes 수정.",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"label\": \"v1.2.3 stable\", \"notes\": \"QA 승인 완료\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "parentId": "fld_orch_game_build"
+    },
+    {
+      "_id": "req_orch_instance_create",
+      "_type": "request",
+      "name": "게임 인스턴스 생성",
+      "url": "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/game-instances",
+      "method": "POST",
+      "description": "SDK 설치본 등록. instanceKey 발급.",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"name\": \"개발 PC 1\", \"platform\": \"UNITY\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "parentId": "fld_orch_game_instance"
+    },
+    {
+      "_id": "req_orch_instance_list",
+      "_type": "request",
+      "name": "게임 인스턴스 목록",
+      "url": "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/game-instances",
+      "method": "GET",
+      "description": "프로젝트 게임 인스턴스 목록.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_orch_game_instance"
+    },
+    {
+      "_id": "req_orch_instance_patch",
+      "_type": "request",
+      "name": "게임 인스턴스 이름 수정",
+      "url": "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/game-instances/{% prompt 'Instance ID', 'myInstanceId', 'Instance ID', '', 'myInstanceId' %}",
+      "method": "PATCH",
+      "description": "인스턴스 이름 변경.",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"name\": \"빌드 서버\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "parentId": "fld_orch_game_instance"
+    },
+    {
+      "_id": "req_orch_instance_delete",
+      "_type": "request",
+      "name": "게임 인스턴스 삭제",
+      "url": "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/game-instances/{% prompt 'Instance ID', 'myInstanceId', 'Instance ID', '', 'myInstanceId' %}",
+      "method": "DELETE",
+      "description": "인스턴스 삭제. 이후 instanceKey 무효화.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_orch_game_instance"
+    },
+    {
+      "_id": "req_orch_sdk_register",
+      "_type": "request",
+      "name": "SDK 인스턴스 등록",
+      "url": "{{ _.stage_orch_base_url }}/api/sdk/registrations",
+      "method": "POST",
+      "description": "SDK가 instanceKey로 등록·버전 보고. JWT 불필요.",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"instanceKey\": \"{{ _.instance_key }}\", \"sdkUuid\": \"550e8400-e29b-41d4-a716-446655440000\", \"gameVersion\": \"1.2.3\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "parentId": "fld_orch_sdk"
+    },
+    {
+      "_id": "req_orch_action",
+      "_type": "request",
+      "name": "게임 인스턴스 액션 전달",
+      "url": "{{ _.stage_orch_base_url }}/api/orchestration/action/{% prompt 'Instance ID', 'myInstanceId', 'Instance ID', '', 'myInstanceId' %}",
+      "method": "POST",
+      "description": "Agent 서버가 게임 인스턴스로 액션 전달. 내부 전용.",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"type\": \"ACTION\", \"id\": 1, \"actions\": [{\"id\": 1, \"jsonrpc\": \"2.0\", \"method\": \"click\", \"params\": [100, 200]}]}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "parentId": "fld_orch_sdk"
+    },
+    {
+      "_id": "req_orch_scenario_create",
+      "_type": "request",
+      "name": "테스트 시나리오 생성",
+      "url": "{{ _.stage_orch_base_url }}/api/test-scenario",
+      "method": "POST",
+      "description": "새 시나리오 생성. testScenarioId 반환.",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"projectId\": {% prompt \"Project ID\", \"myProjectId\", \"Project ID\", \"\", \"1\" %}}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "parentId": "fld_orch_scenario"
+    },
+    {
+      "_id": "req_orch_scenario_get",
+      "_type": "request",
+      "name": "테스트 시나리오 payload 조회",
+      "url": "{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt 'Scenario ID', 'myScenarioId', 'Scenario ID', '', 'myScenarioId' %}",
+      "method": "GET",
+      "description": "ScenarioDraft payload 조회 (canvas 렌더).",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_orch_scenario"
+    },
+    {
+      "_id": "req_orch_scenario_messages",
+      "_type": "request",
+      "name": "테스트 시나리오 채팅 조회",
+      "url": "{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt 'Scenario ID', 'myScenarioId', 'Scenario ID', '', 'myScenarioId' %}/messages",
+      "method": "GET",
+      "description": "사용자별 프라이빗 채팅 조회.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_orch_scenario"
+    },
+    {
+      "_id": "req_orch_scenario_message_send",
+      "_type": "request",
+      "name": "테스트 시나리오 메시지 전송",
+      "url": "{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt 'Scenario ID', 'myScenarioId', 'Scenario ID', '', 'myScenarioId' %}/message",
+      "method": "POST",
+      "description": "사용자 입력 → Agent 중계.",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"type\": \"user_input\", \"testScenarioMessage\": \"1단계를 더 자세히 설명해줘\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "parentId": "fld_orch_scenario"
+    },
+    {
+      "_id": "req_orch_scenario_sse",
+      "_type": "request",
+      "name": "테스트 시나리오 SSE 구독",
+      "url": "{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt 'Scenario ID', 'myScenarioId', 'Scenario ID', '', 'myScenarioId' %}/stream",
+      "method": "GET",
+      "description": "Agent 응답 실시간 수신 (text/event-stream).",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_orch_scenario"
+    },
+    {
+      "_id": "req_orch_scenario_update",
+      "_type": "request",
+      "name": "테스트 시나리오 자동저장(canvas 편집)",
+      "url": "{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt 'Scenario ID', 'myScenarioId', 'Scenario ID', '', 'myScenarioId' %}",
+      "method": "PUT",
+      "description": "**호출 주체**: FE 대시보드(React) → Orchestration\n\n**동작**: Agent를 거치지 않은 순수 canvas 편집(드래그앤드롭 순서변경·필드 수정)을 payload에 저장한다(last-write-wins). FE는 편집을 debounce로 묶어 호출한다.\n\n**Request**\n- `draft` (ScenarioDraft): canvas의 현재 전체 상태\n\n**Response**\n- `200`: `ScenarioResponse { testScenarioId, projectId, payload }` — 저장된 상태 반환\n- `404`: 비참여자/미존재\n\n**활용**: 반환 payload로 FE 로컬 draft ↔ DB 정합성을 맞춘다(dirty 해제).",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"draft\": {\n    \"title\": \"튜토리얼 진행 검증\",\n    \"description\": \"메인→인게임\",\n    \"steps\": [\n      {\"step\": 1, \"title\": \"게임 시작\", \"state\": \"메인 메뉴\", \"action\": \"시작 버튼 클릭\", \"expected\": \"인게임 진입\"}\n    ]\n  }\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "parentId": "fld_orch_scenario"
+    },
+    {
+      "_id": "req_orch_scenario_approve",
+      "_type": "request",
+      "name": "테스트 시나리오 승인(확정)",
+      "url": "{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt 'Scenario ID', 'myScenarioId', 'Scenario ID', '', 'myScenarioId' %}/approve",
+      "method": "POST",
+      "description": "**호출 주체**: FE 대시보드(React) → Orchestration\n\n**동작**: 시나리오를 확정한다. body에 draft가 있으면 payload로 저장하고 Agent 세션(WS)과 SSE 스트림을 닫는다(SSE로 `closed` 이벤트). **채팅 내역과 시나리오는 그대로 남는다(부산물 삭제 없음).**\n\n**Request**\n- `draft` (ScenarioDraft, optional): 확정할 최종본. 생략 시 마지막 저장 payload를 그대로 확정\n\n**Response**\n- `200`: `\"승인 완료\"`\n- `404`: 비참여자/미존재\n\n**활용**: FE Approve 버튼. 확정 후 편집 화면을 정리하고 프로젝트로 복귀.",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"draft\": {\n    \"title\": \"최종본\",\n    \"description\": \"확정된 시나리오\",\n    \"steps\": [\n      {\"step\": 1, \"title\": \"게임 시작\", \"state\": \"메인 메뉴\", \"action\": \"시작 버튼 클릭\", \"expected\": \"인게임 진입\"}\n    ]\n  }\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "parentId": "fld_orch_scenario"
+    },
+    {
+      "_id": "req_orch_scenario_list",
+      "_type": "request",
+      "name": "프로젝트 시나리오 목록 조회",
+      "url": "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', '1' %}/test-scenario",
+      "method": "GET",
+      "description": "**호출 주체**: FE 대시보드(React) → Orchestration\n\n**동작**: 프로젝트에 속한 시나리오 목록(요약)을 조회한다. 목록 화면 렌더용으로 payload 전체 대신 제목만 담는다.\n\n**Request**\n- `[path] projectId` (Long): 소속 프로젝트\n\n**Response**\n- `200`: `{ items: ScenarioSummary[] }` — `ScenarioSummary { testScenarioId, projectId, title, createdAt, updatedAt }`\n- `404`: 비참여자/프로젝트 없음\n\n**활용**: 목록 화면에서 items를 그리고, 클릭 시 편집 화면으로 이동.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_orch_scenario"
+    },
+    {
+      "_id": "req_orch_scenario_get_in_project",
+      "_type": "request",
+      "name": "프로젝트 시나리오 단건 조회",
+      "url": "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', '1' %}/test-scenario/{% prompt 'Scenario ID', 'myScenarioId', 'Scenario ID', '', 'myScenarioId' %}",
+      "method": "GET",
+      "description": "**호출 주체**: FE 대시보드(React) → Orchestration\n\n**동작**: 프로젝트 스코프로 시나리오 단건의 payload를 조회한다.\n\n**Request**\n- `[path] projectId` (Long), `[path] testScenarioId` (Long)\n\n**Response**\n- `200`: `ScenarioResponse { testScenarioId, projectId, payload: ScenarioDraft }`\n- `404`: 미존재/비참여자/projectId 불일치\n\n**활용**: 재방문 시 canvas 렌더 복원.",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "parentId": "fld_orch_scenario"
+    },
+    {
+      "_id": "env_f08753ca2e584292b94234fb9ce7d58d",
+      "_type": "environment",
+      "parentId": "wrk_orch_server",
+      "name": "Base Environment",
+      "description": "Base environment variables",
+      "data": {
+        "stage_orch_base_url": "https://stage-api.artel.kr"
+      },
+      "modified": 1784865148576,
+      "created": 1784865148576
+    },
+    {
+      "_id": "env_f6bb1e2ba058492bb14d92284fa9500a",
+      "_type": "environment",
+      "parentId": "wrk_orch_server",
+      "name": "Base Environment",
+      "description": "Base environment variables",
+      "data": {
+        "stage_orch_jwt": ""
+      },
+      "modified": 1784865149585,
+      "created": 1784865149585
+    }
+  ]
+}
