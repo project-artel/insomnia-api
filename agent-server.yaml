@@ -6,12 +6,17 @@ meta:
   created: 1784719753827
   modified: 1784719865193
   description: >-
-    Artel Agent Server API — 시나리오 생성/QA 세션 엔드포인트.
+    Artel Agent Server API — 시나리오 생성/QA 세션 및 기획서 game_context 추출
+    엔드포인트.
 
     환경: Base Environment는 stage(https://stage-agent.artel.kr), local
     서브 환경은 http://localhost:8000. stage_agent_base_url /
     stage_agent_ws_url 두 변수를 사용한다. 비밀값은 이 파일에 넣지 말고
     Insomnia private environment로 관리한다.
+
+    /extract는 `extract_source_url`(S3 presigned GET URL)을 참조하지만 이 파일은
+    그 값을 정의하지 않는다. 서명이 담긴 시한부 자격증명이므로 각자 private
+    environment에 채운다 — 요청 Docs 패널의 발급 커맨드 참고.
 collection:
   - url: "{{ _.stage_agent_base_url }}/health"
     name: /health — 헬스체크
@@ -109,21 +114,47 @@ collection:
         store: true
       rebuildPath: true
   - url: "{{ _.stage_agent_base_url }}/extract"
-    name: /extract
+    name: /extract — 기획서에서 game_context 추출
     meta:
       id: req_c7f077298de149d28c266bdd0a9b4357
       created: 1784719778638
-      modified: 1784719778638
+      modified: 1784851200000
       isPrivate: false
-      description: ""
+      description: |-
+        **호출 주체**: Orchestration → Agent Server (무상태, 세션 없음)
+
+        **동작**: `source_url`을 httpx로 직접 GET해 문서 바이트를 받고, 확장자/Content-Type으로 로더를 골라(pdf는 pdfplumber, txt·md는 디코드) 평문으로 만든 뒤 LLM에 넘겨 구조화된 `game_context`를 뽑는다.
+
+        **⚠️ source_url은 presigned GET URL이어야 한다.** Agent Server는 AWS 자격증명을 갖지 않고 익명 GET만 한다. 서명은 URL 쿼리스트링(`X-Amz-Signature` 등)에 들어 있고, S3는 그 서명을 만든 IAM 주체의 권한으로 접근을 허용한다. 서명이 없는 평문 S3 URL을 넣으면 버킷이 비공개이므로 `403 AccessDenied` → 이 API는 `502`로 감싼다. 운영에서는 Orchestration이 `/extract` 호출 직전에 발급한다.
+
+        **테스트 준비**: presigned URL은 시한부 서명값이라 이 파일에 커밋하지 않는다. 아래로 발급해 개인 환경(private environment)의 `extract_source_url`에 넣는다.
+
+        ```
+        aws s3 presign "s3://<bucket>/<key>" --expires-in 3600 --region ap-northeast-2
+        ```
+
+        `filename`은 URL과 별개로 포맷 판별 힌트이므로, presign한 객체와 같은 확장자를 유지한다.
+
+        **Request**
+        - `source_url` (string, 필수): presigned GET URL
+        - `filename` (string, 필수): 포맷 판별용 파일명. `.pdf` / `.txt` / `.md` 지원
+        - `model` (enum, 선택): 기본 `openai/gpt-4o-mini`. `openai/gpt-4o`, `anthropic/claude-sonnet-5`, `anthropic/claude-opus-4.8`, `google/gemini-2.5-flash`, `google/gemini-2.5-pro`, `google/gemma-4-31b-it:free`
+
+        **Response**
+        - `200`: `{ filename, game_context }`. `game_context`는 `overview`, `screens`, `mechanics`, `entities`, `progression`, `flows`, `glossary`, `misc` 8개 섹션 고정
+        - `415`: 지원하지 않는 포맷
+        - `422`: 추출 결과가 스키마 검증 실패
+        - `502`: 문서 fetch 실패(서명 없음·만료·크기 초과·타임아웃) 또는 LLM 오류
+
+        **활용**: 반환된 `game_context`를 Orchestration이 저장하고, 이후 시나리오 세션의 `game_context` 입력으로 재사용한다. 원본 PDF는 S3에 남고 presigned URL은 저장하지 않는다.
       sortKey: -1784697066598.5
     method: POST
     body:
       mimeType: application/json
-      text: >-
+      text: |-
         {
-          "source_url": "https://artel-qa-agent-asm2026-s3-bucket.s3.ap-northeast-2.amazonaws.com/projects/1/documents/62e14a26-bb57-4feb-845c-e4a789b697dd/27760374-f913-481c-a2ab-27835cbe5c41.pdf",
-          "filename": "27760374-f913-481c-a2ab-27835cbe5c41.pdf",
+          "source_url": "{{ _.extract_source_url }}",
+          "filename": "REPLACE_FILENAME.pdf",
           "model": "openai/gpt-4o-mini"
         }
     headers:
