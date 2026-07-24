@@ -5,8 +5,13 @@ meta:
   id: wrk_3b5acfc130bd41b088450cbe1090a668
   created: 1784719753827
   modified: 1784719865193
-  description: Artel Agent Server API — 시나리오 생성/QA 세션 엔드포인트. 도메인은 base_url/ws_url
-    환경변수의 <server-domain>을 실제 도메인(nginx)으로 교체해 사용.
+  description: >-
+    Artel Agent Server API — 시나리오 생성/QA 세션 엔드포인트.
+
+    환경: Base Environment는 stage(https://stage-agent.artel.kr), local
+    서브 환경은 http://localhost:8000. stage_agent_base_url /
+    stage_agent_ws_url 두 변수를 사용한다. 비밀값은 이 파일에 넣지 말고
+    Insomnia private environment로 관리한다.
 collection:
   - url: "{{ _.stage_agent_base_url }}/health"
     name: /health — 헬스체크
@@ -186,3 +191,17 @@ environments:
     created: 1784719753839
     modified: 1784719753839
     isPrivate: false
+  data:
+    stage_agent_base_url: https://stage-agent.artel.kr
+    stage_agent_ws_url: wss://stage-agent.artel.kr
+  subEnvironments:
+    - name: local
+      meta:
+        id: env_local_41004648003010da0dad5af502cda7b
+        created: 1784851200000
+        modified: 1784851200000
+        isPrivate: false
+        sortKey: 0
+      data:
+        stage_agent_base_url: http://localhost:8000
+        stage_agent_ws_url: ws://localhost:8000
