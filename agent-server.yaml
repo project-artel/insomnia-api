@@ -1,0 +1,188 @@
+type: collection.insomnia.rest/5.0
+schema_version: "5.1"
+name: agent-server
+meta:
+  id: wrk_3b5acfc130bd41b088450cbe1090a668
+  created: 1784719753827
+  modified: 1784719865193
+  description: Artel Agent Server API — 시나리오 생성/QA 세션 엔드포인트. 도메인은 base_url/ws_url
+    환경변수의 <server-domain>을 실제 도메인(nginx)으로 교체해 사용.
+collection:
+  - url: "{{ _.stage_agent_base_url }}/health"
+    name: /health — 헬스체크
+    meta:
+      id: req_b84c5bd10e2042869417e8aade4ea781
+      created: 1784681456367
+      modified: 1784719085522
+      isPrivate: false
+      description: 'Liveness probe. 200 OK with {"status":"ok"}. tags: system'
+      sortKey: -1784682511793
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.stage_agent_base_url }}/sessions"
+    name: /sessions — 세션 열기
+    meta:
+      id: req_7d5ab9224f184b338e9e2e7a12df2f3c
+      created: 1784681461524
+      modified: 1784719085526
+      isPrivate: false
+      description: >-
+        시나리오 세션 생성. 응답: {"session_id": "..."}. 이후 WS /sessions/{session_id}로 연결.
+
+        model enum: openai/gpt-4o-mini(기본), openai/gpt-4o,
+        anthropic/claude-sonnet-5, anthropic/claude-opus-4.8,
+        google/gemini-2.5-flash, google/gemini-2.5-pro,
+        google/gemma-4-31b-it:free. tags: scenario
+      sortKey: -1784682511794
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "user_input": "로그인 화면에서 잘못된 비밀번호를 입력하는 시나리오를 만들어줘",
+          "unity_context": {},
+          "game_context": {},
+          "model": "openai/gpt-4o-mini"
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+        disabled: false
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.stage_agent_base_url }}/sessions/{% response 'body',
+      'req_7d5ab9224f184b338e9e2e7a12df2f3c', 'b64::JC5zZXNzaW9uX2lk::46b',
+      'never', 60 %}/approve"
+    name: /sessions/{session_id}/approve — 승인·종료
+    meta:
+      id: req_61b7e8a85810422eb2d2c19b3890eff5
+      created: 1784681463447
+      modified: 1784719085523
+      isPrivate: false
+      description: '현재 draft 승인 후 세션 종료. 응답: {"ok": true}. tags: scenario'
+      sortKey: -1784682511796
+    method: POST
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.stage_agent_base_url }}/sessions/{% response 'body',
+      'req_7d5ab9224f184b338e9e2e7a12df2f3c', 'b64::JC5zZXNzaW9uX2lk::46b',
+      'never', 60 %}/decline"
+    name: /sessions/{session_id}/decline — 거절·종료
+    meta:
+      id: req_1350e17a0fcc4705b0c65002832f977b
+      created: 1784681464984
+      modified: 1784719085525
+      isPrivate: false
+      description: '현재 draft 거절 후 세션 종료. 응답: {"ok": true}. tags: scenario'
+      sortKey: -1784682511797
+    method: POST
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.stage_agent_base_url }}/extract"
+    name: /extract
+    meta:
+      id: req_c7f077298de149d28c266bdd0a9b4357
+      created: 1784719778638
+      modified: 1784719778638
+      isPrivate: false
+      description: ""
+      sortKey: -1784697066598.5
+    method: POST
+    body:
+      mimeType: application/json
+      text: >-
+        {
+          "source_url": "https://artel-qa-agent-asm2026-s3-bucket.s3.ap-northeast-2.amazonaws.com/projects/1/documents/62e14a26-bb57-4feb-845c-e4a789b697dd/27760374-f913-481c-a2ab-27835cbe5c41.pdf",
+          "filename": "27760374-f913-481c-a2ab-27835cbe5c41.pdf",
+          "model": "openai/gpt-4o-mini"
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.stage_agent_ws_url }}/sessions/{% response 'body',
+      'req_7d5ab9224f184b338e9e2e7a12df2f3c', 'b64::JC5zZXNzaW9uX2lk::46b',
+      'never', 60 %}"
+    name: /sessions/{session_id} — 시나리오 스트림
+    meta:
+      id: ws-req_ddf5b310e09648fb92147dcde3e73631
+      created: 1784682778201
+      modified: 1784719085528
+      description: |-
+        시나리오 실시간 스트림 (WebSocket).
+
+        [흐름]
+        1) POST /sessions 로 session_id 획득 → 환경변수 session_id 설정
+        2) 이 URL로 WS 연결 → 서버가 첫 turn 결과(result 이벤트) 전송
+        3) 클라이언트가 turn 메시지 전송 → 서버가 result 응답
+
+        [클라이언트 → 서버 (turn)]
+        {
+          "type": "turn",
+          "user_input": "2단계를 더 구체적으로 바꿔줘",
+          "draft": {
+            "title": "로그인 실패 시나리오",
+            "description": "잘못된 비밀번호 입력 흐름",
+            "steps": [
+              {"step": 1, "title": "로그인 화면 진입", "state": "앱 실행됨", "action": "로그인 버튼 탭", "expected": "로그인 폼 표시"}
+            ]
+          },
+          "model": "openai/gpt-4o-mini"
+        }
+        (draft·model 선택. steps는 1부터 연속 번호)
+
+        [서버 → 클라이언트]
+        result: {"type":"result","message":"...","scenario":{"title":"...","description":"...","steps":[...]}}
+        error : {"type":"error","code":"session_expired|bad_request|validation_error|llm_error","detail":"..."}
+      sortKey: -1784682778201
+    settings:
+      encodeUrl: true
+      cookies:
+        store: true
+        send: true
+      followRedirects: global
+cookieJar:
+  name: Default Jar
+  meta:
+    id: jar_41004648003010da0dad5af502cda7b71f70d092
+    created: 1784719753842
+    modified: 1784719753842
+environments:
+  name: Base Environment
+  meta:
+    id: env_41004648003010da0dad5af502cda7b71f70d092
+    created: 1784719753839
+    modified: 1784719753839
+    isPrivate: false
