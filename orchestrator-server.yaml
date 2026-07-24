@@ -1,0 +1,427 @@
+type: collection.insomnia.rest/5.0
+schema_version: "5.1"
+name: orchestrator-server
+meta:
+  id: wrk_orch_artel_api_collection
+  created: 1784859800000
+  modified: 1784859800000
+  description: >-
+    Artel Orchestration Server API — 인증, 프로젝트, 기획서, 게임빌드·인스턴스, SDK·Agent·TestScenario.
+    환경: Base Environment는 stage(https://stage-api.artel.kr). stage_orch_base_url 변수 사용.
+collection:
+  - url: "{{ _.stage_orch_base_url }}/oauth2/authorization/github"
+    name: OAuth 로그인 시작
+    meta:
+      id: req_orch_oauth_start
+      created: 1784859801000
+      modified: 1784859801000
+      isPrivate: false
+      description: GitHub OAuth 로그인 시작. 브라우저 리다이렉트.
+    method: GET
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+  - url: "{{ _.stage_orch_base_url }}/login/oauth2/code/github"
+    name: OAuth 콜백
+    meta:
+      id: req_orch_oauth_callback
+      created: 1784859802000
+      modified: 1784859802000
+      isPrivate: false
+      description: GitHub OAuth 콜백. code·state 쿼리 파라미터로 JWT 교환.
+    method: GET
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+  - url: "{{ _.stage_orch_base_url }}/api/auth/me"
+    name: 내 정보
+    meta:
+      id: req_orch_auth_me
+      created: 1784859803000
+      modified: 1784859803000
+      isPrivate: false
+      description: 현재 JWT 사용자 정보. 401 Unauthorized 가능.
+    method: GET
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/auth/logout"
+    name: 로그아웃
+    meta:
+      id: req_orch_auth_logout
+      created: 1784859804000
+      modified: 1784859804000
+      isPrivate: false
+      description: JWT 쿠키 삭제.
+    method: POST
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+  - url: "{{ _.stage_orch_base_url }}/api/projects"
+    name: 프로젝트 목록 조회
+    meta:
+      id: req_orch_project_list
+      created: 1784859805000
+      modified: 1784859805000
+      isPrivate: false
+      description: 내 프로젝트 목록.
+    method: GET
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/projects"
+    name: 프로젝트 등록
+    meta:
+      id: req_orch_project_create
+      created: 1784859806000
+      modified: 1784859806000
+      isPrivate: false
+      description: 새 프로젝트 등록.
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"name": "My Game", "description": "테스트 게임 프로젝트"}'
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}"
+    name: 프로젝트 단일 조회
+    meta:
+      id: req_orch_project_get
+      created: 1784859807000
+      modified: 1784859807000
+      isPrivate: false
+      description: 프로젝트 상세.
+    method: GET
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}"
+    name: 프로젝트 수정
+    meta:
+      id: req_orch_project_patch
+      created: 1784859808000
+      modified: 1784859808000
+      isPrivate: false
+      description: 프로젝트 이름/설명 수정.
+    method: PATCH
+    body:
+      mimeType: application/json
+      text: '{"name": "Renamed Project"}'
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}"
+    name: 프로젝트 삭제
+    meta:
+      id: req_orch_project_delete
+      created: 1784859809000
+      modified: 1784859809000
+      isPrivate: false
+      description: 프로젝트 삭제. 204 No Content.
+    method: DELETE
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/documents/upload-url"
+    name: 기획서 업로드 URL 발급
+    meta:
+      id: req_orch_doc_upload
+      created: 1784859810000
+      modified: 1784859810000
+      isPrivate: false
+      description: S3 presigned URL 발급.
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"fileName": "GDD_v1.pdf", "contentType": "application/pdf"}'
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/documents"
+    name: 문서 업로드
+    meta:
+      id: req_orch_doc_upload_confirm
+      created: 1784859811000
+      modified: 1784859811000
+      isPrivate: false
+      description: S3 업로드 후 문서 등록.
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"fileName": "GDD_v1.pdf", "s3Key": "projects/1/documents/abc-123/GDD_v1.pdf"}'
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/documents"
+    name: 기획서 이력 조회
+    meta:
+      id: req_orch_doc_list
+      created: 1784859812000
+      modified: 1784859812000
+      isPrivate: false
+      description: 프로젝트 문서 목록.
+    method: GET
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/documents/{% prompt 'Document ID', 'myDocId', 'Document ID', '', 'myDocId' %}/download-url"
+    name: 기획서 다운로드 URL 발급
+    meta:
+      id: req_orch_doc_download
+      created: 1784859813000
+      modified: 1784859813000
+      isPrivate: false
+      description: S3 presigned 다운로드 URL.
+    method: GET
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/game-builds"
+    name: 게임 빌드 목록
+    meta:
+      id: req_orch_build_list
+      created: 1784859814000
+      modified: 1784859814000
+      isPrivate: false
+      description: SDK가 보고한 게임 버전 목록.
+    method: GET
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/game-builds/{% prompt 'Build ID', 'myBuildId', 'Build ID', '', 'myBuildId' %}"
+    name: 게임 빌드 설명 수정
+    meta:
+      id: req_orch_build_patch
+      created: 1784859815000
+      modified: 1784859815000
+      isPrivate: false
+      description: label·notes 수정.
+    method: PATCH
+    body:
+      mimeType: application/json
+      text: '{"label": "v1.2.3 stable", "notes": "QA 승인 완료"}'
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/game-instances"
+    name: 게임 인스턴스 생성
+    meta:
+      id: req_orch_instance_create
+      created: 1784859816000
+      modified: 1784859816000
+      isPrivate: false
+      description: SDK 설치본 등록. instanceKey 발급.
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"name": "개발 PC 1", "platform": "UNITY"}'
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/game-instances"
+    name: 게임 인스턴스 목록
+    meta:
+      id: req_orch_instance_list
+      created: 1784859817000
+      modified: 1784859817000
+      isPrivate: false
+      description: 프로젝트 게임 인스턴스 목록.
+    method: GET
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/game-instances/{% prompt 'Instance ID', 'myInstanceId', 'Instance ID', '', 'myInstanceId' %}"
+    name: 게임 인스턴스 이름 수정
+    meta:
+      id: req_orch_instance_patch
+      created: 1784859818000
+      modified: 1784859818000
+      isPrivate: false
+      description: 인스턴스 이름 변경.
+    method: PATCH
+    body:
+      mimeType: application/json
+      text: '{"name": "빌드 서버"}'
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/projects/{% prompt 'Project ID', 'myProjectId', 'Project ID', '', 'myProjectId' %}/game-instances/{% prompt 'Instance ID', 'myInstanceId', 'Instance ID', '', 'myInstanceId' %}"
+    name: 게임 인스턴스 삭제
+    meta:
+      id: req_orch_instance_delete
+      created: 1784859819000
+      modified: 1784859819000
+      isPrivate: false
+      description: 인스턴스 삭제. 이후 instanceKey 무효화.
+    method: DELETE
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/sdk/registrations"
+    name: SDK 인스턴스 등록
+    meta:
+      id: req_orch_sdk_register
+      created: 1784859820000
+      modified: 1784859820000
+      isPrivate: false
+      description: SDK가 instanceKey로 등록·버전 보고. JWT 불필요.
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"instanceKey": "{{ _.instance_key }}", "sdkUuid": "550e8400-e29b-41d4-a716-446655440000", "gameVersion": "1.2.3"}'
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+  - url: "{{ _.stage_orch_base_url }}/api/orchestration/action/{% prompt 'Instance ID', 'myInstanceId', 'Instance ID', '', 'myInstanceId' %}"
+    name: 게임 인스턴스 액션 전달
+    meta:
+      id: req_orch_action
+      created: 1784859821000
+      modified: 1784859821000
+      isPrivate: false
+      description: Agent 서버가 게임 인스턴스로 액션 전달. 내부 전용.
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"type": "ACTION", "id": 1, "actions": [{"id": 1, "jsonrpc": "2.0", "method": "click", "params": [100, 200]}]}'
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+  - url: "{{ _.stage_orch_base_url }}/api/test-scenario"
+    name: 테스트 시나리오 생성
+    meta:
+      id: req_orch_scenario_create
+      created: 1784859822000
+      modified: 1784859822000
+      isPrivate: false
+      description: 새 시나리오 생성. testScenarioId 반환.
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"projectId": {% prompt "Project ID", "myProjectId", "Project ID", "", "1" %}}'
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt 'Scenario ID', 'myScenarioId', 'Scenario ID', '', 'myScenarioId' %}"
+    name: 테스트 시나리오 payload 조회
+    meta:
+      id: req_orch_scenario_get
+      created: 1784859823000
+      modified: 1784859823000
+      isPrivate: false
+      description: ScenarioDraft payload 조회 (canvas 렌더).
+    method: GET
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt 'Scenario ID', 'myScenarioId', 'Scenario ID', '', 'myScenarioId' %}/messages"
+    name: 테스트 시나리오 채팅 조회
+    meta:
+      id: req_orch_scenario_messages
+      created: 1784859824000
+      modified: 1784859824000
+      isPrivate: false
+      description: 사용자별 프라이빗 채팅 조회.
+    method: GET
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt 'Scenario ID', 'myScenarioId', 'Scenario ID', '', 'myScenarioId' %}/message"
+    name: 테스트 시나리오 메시지 전송
+    meta:
+      id: req_orch_scenario_message_send
+      created: 1784859825000
+      modified: 1784859825000
+      isPrivate: false
+      description: 사용자 입력 → Agent 중계.
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"type": "user_input", "testScenarioMessage": "1단계를 더 자세히 설명해줘"}'
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+  - url: "{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt 'Scenario ID', 'myScenarioId', 'Scenario ID', '', 'myScenarioId' %}/stream"
+    name: 테스트 시나리오 SSE 구독
+    meta:
+      id: req_orch_scenario_sse
+      created: 1784859826000
+      modified: 1784859826000
+      isPrivate: false
+      description: Agent 응답 실시간 수신 (text/event-stream).
+    method: GET
+    settings: { renderRequestBody: true, encodeUrl: true, followRedirects: global, cookies: { send: true, store: true }, rebuildPath: true }
+    authentication:
+      type: bearer
+      token: "{{ _.stage_orch_jwt }}"
+cookieJar:
+  name: Default Jar
+  meta:
+    id: jar_orch_default
+    created: 1784859800000
+    modified: 1784859800000
+environments:
+  name: Base Environment
+  meta:
+    id: env_orch_base
+    created: 1784859800000
+    modified: 1784859800000
+    isPrivate: false
+  data:
+    stage_orch_base_url: https://stage-api.artel.kr
+    stage_orch_jwt: "{{ stage_orch_jwt }}"
+  subEnvironments:
+    - name: local
+      meta:
+        id: env_orch_local
+        created: 1784859800001
+        modified: 1784859800001
+        isPrivate: false
+        sortKey: 0
+      data:
+        stage_orch_base_url: http://localhost:8080
+        stage_orch_jwt: "{{ stage_orch_jwt }}"
