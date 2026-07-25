@@ -1202,51 +1202,6 @@ collection:
     modified: 1784859807000
   children:
   - url: '{{ _.stage_orch_base_url }}/api/orchestration/reference-context'
-    name: PUT /api/orchestration/reference-context — 참고자료 컨텍스트 저장(추출 적재)
-    meta:
-      id: req_orch_refctx_store
-      created: 1784859900000
-      modified: 1784859900000
-      isPrivate: false
-      description: '**호출 주체**: Agent/추출 파이프라인 → Orchestration (내부, permitAll)
-
-
-        **동작**: 문서에서 추출한 game_context를 타입별로 저장한다. 한 문서(sourceDocumentId)의 game_context를 8개 타입(overview·screens·mechanics·entities·progression·flows·glossary·misc) 행으로 분해해 reference_context에 넣는다. 같은 (projectId, sourceDocumentId) 재호출 시 그 문서분만 교체(멱등)하고, 적재 완료 시 project_document.parse_status를 EXTRACTED로 갱신한다.
-
-
-        **Request**
-
-        - `projectId` (number, 필수)
-
-        - `sourceDocumentId` (number, 필수): project_document.id (원본 S3 추적 키)
-
-        - `gameContext` (object, 필수): Agent `/extract` 산출물 그대로
-
-
-        **Response**
-
-        - `204`: 저장 완료
-
-        - `400`: 본문 형식 오류
-
-
-        **활용**: Agent가 `/extract`로 뽑은 game_context를 이 API로 push하면, 이후 조회 API로 타입별 참고한다.'
-    method: PUT
-    body:
-      mimeType: application/json
-      text: "{\n  \"projectId\": 1,\n  \"sourceDocumentId\": 10,\n  \"gameContext\": {\n    \"overview\": { \"title\": \"Word Online\", \"genre\": \"card battle\", \"core_loop\": \"select-combine-cast\" },\n    \"mechanics\": [ { \"name\": \"Card System\", \"rules\": [\"one magic + one attribute\"] } ],\n    \"entities\": [ { \"name\": \"Magic Card\", \"type\": \"item\", \"attributes\": [\"action: summon\"] } ]\n  }\n}"
-    headers:
-    - name: Content-Type
-      value: application/json
-    settings:
-      renderRequestBody: true
-      encodeUrl: true
-      followRedirects: global
-      cookies:
-        send: true
-        store: true
-      rebuildPath: true
-  - url: '{{ _.stage_orch_base_url }}/api/orchestration/reference-context'
     name: GET /api/orchestration/reference-context — 참고자료 컨텍스트 타입별 조회
     meta:
       id: req_orch_refctx_query
