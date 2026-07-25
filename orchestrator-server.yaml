@@ -7,1237 +7,1285 @@ meta:
   modified: 1784859800000
   description: 'Artel Orchestration Server API — 인증, 프로젝트, 기획서, 게임빌드·인스턴스, SDK·Agent·TestScenario. 환경: Base Environment는 stage(https://stage-api.artel.kr). stage_orch_base_url 변수 사용.'
 collection:
-- url: '{{ _.stage_orch_base_url }}/oauth2/authorization/github'
-  name: GET /oauth2/authorization/github — OAuth 로그인 시작
+- name: Auth
   meta:
-    id: req_orch_oauth_start
+    id: fld_orch_auth
+    created: 1784859800000
+    modified: 1784859800000
+  children:
+  - url: '{{ _.stage_orch_base_url }}/oauth2/authorization/github'
+    name: GET /oauth2/authorization/github — OAuth 로그인 시작
+    meta:
+      id: req_orch_oauth_start
+      created: 1784859801000
+      modified: 1784859801000
+      isPrivate: false
+      description: '**호출 주체**: 브라우저(FE) → Orchestration (Spring Security)
+
+
+        **동작**: GitHub OAuth2 인가 페이지로 302 리다이렉트한다. 사용자가 GitHub에서 승인하면 콜백으로 돌아온다.
+
+
+        **Request**
+
+        - 없음
+
+
+        **Response**
+
+        - `302`: GitHub 인가 URL로 리다이렉트
+
+
+        **활용**: 로그인 진입점. 최종적으로 콜백에서 `artel_access_token`(JWT) 쿠키를 발급받는다.'
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: '{{ _.stage_orch_base_url }}/login/oauth2/code/github'
+    name: GET /login/oauth2/code/github — OAuth 콜백
+    meta:
+      id: req_orch_oauth_callback
+      created: 1784859802000
+      modified: 1784859802000
+      isPrivate: false
+      description: '**호출 주체**: GitHub → Orchestration
+
+
+        **동작**: `code`·`state`로 GitHub 토큰을 교환해 사용자 프로필을 받고 app_user를 upsert한 뒤, `artel_access_token`(JWT) 쿠키를 심고 FE로 리다이렉트한다.
+
+
+        **Request**
+
+        - `code` (query): GitHub 인가 코드
+
+        - `state` (query): CSRF 방지 state
+
+
+        **Response**
+
+        - `302`: FE로 리다이렉트 + `Set-Cookie: artel_access_token`
+
+
+        **활용**: 이후 모든 인증 요청은 이 쿠키(또는 Bearer)로 이루어진다.'
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: '{{ _.stage_orch_base_url }}/api/auth/me'
+    name: GET /api/auth/me — 내 정보 조회
+    meta:
+      id: req_orch_auth_me
+      created: 1784859803000
+      modified: 1784859803000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: 쿠키/Bearer의 JWT를 검증하고 현재 로그인 사용자 정보를 반환한다.
+
+
+        **Request**
+
+        - `artel_access_token` (cookie) 또는 `Authorization: Bearer <jwt>`
+
+
+        **Response**
+
+        - `200`: `{ userId, displayName, email, ... }`
+
+        - `401`: 토큰 없음/만료
+
+
+        **활용**: FE 초기 진입 시 세션 유효성 확인과 사용자 표시에 쓴다.'
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/auth/logout'
+    name: POST /api/auth/logout — 로그아웃
+    meta:
+      id: req_orch_auth_logout
+      created: 1784859804000
+      modified: 1784859804000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: `artel_access_token` 쿠키를 만료시켜 삭제한다.
+
+
+        **Request**
+
+        - 없음(쿠키만)
+
+
+        **Response**
+
+        - `200`: 로그아웃 완료'
+    method: POST
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+- name: Project
+  meta:
+    id: fld_orch_project
     created: 1784859801000
     modified: 1784859801000
-    isPrivate: false
-    description: '**호출 주체**: 브라우저(FE) → Orchestration (Spring Security)
+  children:
+  - url: '{{ _.stage_orch_base_url }}/api/projects'
+    name: GET /api/projects — 프로젝트 목록 조회
+    meta:
+      id: req_orch_project_list
+      created: 1784859805000
+      modified: 1784859805000
+      isPrivate: false
+      description: '**호출 주체**: FE 대시보드 → Orchestration
 
 
-      **동작**: GitHub OAuth2 인가 페이지로 302 리다이렉트한다. 사용자가 GitHub에서 승인하면 콜백으로 돌아온다.
+        **동작**: 내가 멤버로 속한 프로젝트를 페이지네이션으로 조회한다. 각 항목에 최신 기획서/문서 수 등 요약을 포함한다(N+1 회피 위해 일괄 조회).
 
 
-      **Request**
+        **Request**
 
-      - 없음
+        - `page` (query, 선택): 0-base 페이지
 
-
-      **Response**
-
-      - `302`: GitHub 인가 URL로 리다이렉트
+        - `size` (query, 선택): 페이지 크기
 
 
-      **활용**: 로그인 진입점. 최종적으로 콜백에서 `artel_access_token`(JWT) 쿠키를 발급받는다.'
-  method: GET
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-- url: '{{ _.stage_orch_base_url }}/login/oauth2/code/github'
-  name: GET /login/oauth2/code/github — OAuth 콜백
+        **Response**
+
+        - `200`: `{ items: [ { id, name, genre, latestDocument?, documentCount, ... } ], page, size, total }`
+
+
+        **활용**: 대시보드의 프로젝트 카드 목록을 그린다.'
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects'
+    name: POST /api/projects — 프로젝트 등록
+    meta:
+      id: req_orch_project_create
+      created: 1784859806000
+      modified: 1784859806000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: 프로젝트를 생성하고 요청자를 OWNER 멤버로 등록한다.
+
+
+        **Request**
+
+        - `name` (string, 필수)
+
+        - `genre` (string, 필수)
+
+        - `description` (string, 선택)
+
+
+        **Response**
+
+        - `201`: `{ projectId }`
+
+
+        **활용**: 반환된 `projectId`를 이후 기획서/시나리오/인스턴스 요청의 경로 키로 쓴다.'
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"name": "My Game", "description": "테스트 게임 프로젝트"}'
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}'
+    name: GET /api/projects/{projectId} — 프로젝트 단일 조회
+    meta:
+      id: req_orch_project_get
+      created: 1784859807000
+      modified: 1784859807000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: 멤버인 프로젝트 하나를 조회한다. 비멤버/미존재는 구분 없이 감춘다.
+
+
+        **Request**
+
+        - `projectId` (path)
+
+
+        **Response**
+
+        - `200`: 프로젝트 상세
+
+        - `404`: 비참여자 또는 미존재'
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}'
+    name: PATCH /api/projects/{projectId} — 프로젝트 수정
+    meta:
+      id: req_orch_project_patch
+      created: 1784859808000
+      modified: 1784859808000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: 프로젝트 메타(name/description/genre)를 부분 수정한다.
+
+
+        **Request**
+
+        - `projectId` (path)
+
+        - `{ name?, description?, genre? }`
+
+
+        **Response**
+
+        - `200`: 수정된 프로젝트
+
+        - `404`: 비참여자/미존재'
+    method: PATCH
+    body:
+      mimeType: application/json
+      text: '{"name": "Renamed Project"}'
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}'
+    name: DELETE /api/projects/{projectId} — 프로젝트 삭제
+    meta:
+      id: req_orch_project_delete
+      created: 1784859809000
+      modified: 1784859809000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: 프로젝트를 soft delete(`deleted_at`)한다. 목록/조회에서 제외된다.
+
+
+        **Request**
+
+        - `projectId` (path)
+
+
+        **Response**
+
+        - `204`: 삭제 완료
+
+        - `404`: 비참여자/미존재'
+    method: DELETE
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+- name: Document (기획서)
   meta:
-    id: req_orch_oauth_callback
+    id: fld_orch_document
     created: 1784859802000
     modified: 1784859802000
-    isPrivate: false
-    description: '**호출 주체**: GitHub → Orchestration
+  children:
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/documents/upload-url'
+    name: POST /api/projects/{projectId}/documents/upload-url — 기획서 업로드 URL 발급
+    meta:
+      id: req_orch_doc_upload
+      created: 1784859810000
+      modified: 1784859810000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
 
 
-      **동작**: `code`·`state`로 GitHub 토큰을 교환해 사용자 프로필을 받고 app_user를 upsert한 뒤, `artel_access_token`(JWT) 쿠키를 심고 FE로 리다이렉트한다.
+        **동작**: S3 presigned **PUT** URL을 발급한다. FE는 이 URL로 파일을 S3에 직접 올린다. PDF만 허용하며 object_key는 서버가 정한다.
 
 
-      **Request**
+        **Request**
 
-      - `code` (query): GitHub 인가 코드
+        - `projectId` (path)
 
-      - `state` (query): CSRF 방지 state
+        - `fileName` (string, 필수)
 
-
-      **Response**
-
-      - `302`: FE로 리다이렉트 + `Set-Cookie: artel_access_token`
+        - `sizeBytes` (number, 필수)
 
 
-      **활용**: 이후 모든 인증 요청은 이 쿠키(또는 Bearer)로 이루어진다.'
-  method: GET
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-- url: '{{ _.stage_orch_base_url }}/api/auth/me'
-  name: GET /api/auth/me — 내 정보 조회
+        **Response**
+
+        - `200`: `{ objectKey, url }` (url = presigned PUT)
+
+
+        **활용**: S3 PUT 성공 후 `objectKey`로 업로드 확정(등록) 요청을 보낸다.'
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"fileName": "GDD_v1.pdf", "contentType": "application/pdf"}'
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/documents'
+    name: POST /api/projects/{projectId}/documents — 기획서 업로드 확정(등록)
+    meta:
+      id: req_orch_doc_upload_confirm
+      created: 1784859811000
+      modified: 1784859811000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: S3에 올라간 객체를 HEAD로 검증(존재·PDF 매직·경로)하고 project_document 행을 만든다. 같은 프로젝트에 다시 올리면 교체가 아니라 version이 증가한다.
+
+
+        **Request**
+
+        - `projectId` (path)
+
+        - `objectKey` (string, 필수): 업로드 URL 발급 때 받은 키
+
+
+        **Response**
+
+        - `201`: 등록된 문서 `{ id, version, fileName, parseStatus(PENDING), ... }`
+
+
+        **활용**: 이 문서(id)가 추출(/extract) → reference_context 적재의 출처(sourceDocumentId)가 된다.'
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"fileName": "GDD_v1.pdf", "s3Key": "projects/1/documents/abc-123/GDD_v1.pdf"}'
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/documents'
+    name: GET /api/projects/{projectId}/documents — 기획서 이력 조회
+    meta:
+      id: req_orch_doc_list
+      created: 1784859812000
+      modified: 1784859812000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: 프로젝트의 기획서 버전을 최신순으로 나열한다.
+
+
+        **Request**
+
+        - `projectId` (path)
+
+
+        **Response**
+
+        - `200`: `[ { id, version, fileName, uploadedAt, uploadedBy, parseStatus }, ... ]`
+
+
+        **참고**: `parseStatus`는 PENDING(업로드만) → EXTRACTED(reference_context 적재 완료).'
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/documents/{% prompt ''Document ID'', ''myDocId'', ''Document ID'', '''', ''myDocId'' %}/download-url'
+    name: GET /api/projects/{projectId}/documents/{documentId}/download-url — 기획서 다운로드 URL 발급
+    meta:
+      id: req_orch_doc_download
+      created: 1784859813000
+      modified: 1784859813000
+      isPrivate: false
+      description: '**호출 주체**: FE, 그리고 추출 파이프라인 → Orchestration
+
+
+        **동작**: 원본 PDF의 presigned **GET** URL(TTL 5분)을 발급한다.
+
+
+        **Request**
+
+        - `projectId`, `documentId` (path)
+
+
+        **Response**
+
+        - `200`: `{ url }` (presigned GET, 서명값 `X-Amz-Signature` 포함)
+
+
+        **활용**: 같은 URL을 Agent `/extract`의 `source_url`로 넘긴다. 자격증명 없는 배포에선 서명 없는 URL이 나오므로 서명 유무를 확인한다.'
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+- name: Game Build
   meta:
-    id: req_orch_auth_me
+    id: fld_orch_gamebuild
     created: 1784859803000
     modified: 1784859803000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
+  children:
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/game-builds'
+    name: GET /api/projects/{projectId}/game-builds — 게임 빌드 목록
+    meta:
+      id: req_orch_build_list
+      created: 1784859814000
+      modified: 1784859814000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
 
 
-      **동작**: 쿠키/Bearer의 JWT를 검증하고 현재 로그인 사용자 정보를 반환한다.
+        **동작**: 프로젝트의 게임 빌드를 나열한다.
 
 
-      **Request**
+        **Request**
 
-      - `artel_access_token` (cookie) 또는 `Authorization: Bearer <jwt>`
-
-
-      **Response**
-
-      - `200`: `{ userId, displayName, email, ... }`
-
-      - `401`: 토큰 없음/만료
+        - `projectId` (path)
 
 
-      **활용**: FE 초기 진입 시 세션 유효성 확인과 사용자 표시에 쓴다.'
-  method: GET
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/auth/logout'
-  name: POST /api/auth/logout — 로그아웃
+        **Response**
+
+        - `200`: 빌드 목록'
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/game-builds/{% prompt ''Build ID'', ''myBuildId'', ''Build ID'', '''', ''myBuildId'' %}'
+    name: PATCH /api/projects/{projectId}/game-builds/{buildId} — 게임 빌드 설명 수정
+    meta:
+      id: req_orch_build_patch
+      created: 1784859815000
+      modified: 1784859815000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: 특정 게임 빌드의 설명을 수정한다.
+
+
+        **Request**
+
+        - `projectId`, `buildId` (path)
+
+        - `{ description }`
+
+
+        **Response**
+
+        - `200`: 수정된 빌드'
+    method: PATCH
+    body:
+      mimeType: application/json
+      text: '{"label": "v1.2.3 stable", "notes": "QA 승인 완료"}'
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+- name: Game Instance
   meta:
-    id: req_orch_auth_logout
+    id: fld_orch_gameinstance
     created: 1784859804000
     modified: 1784859804000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
+  children:
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/game-instances'
+    name: POST /api/projects/{projectId}/game-instances — 게임 인스턴스 생성
+    meta:
+      id: req_orch_instance_create
+      created: 1784859816000
+      modified: 1784859816000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
 
 
-      **동작**: `artel_access_token` 쿠키를 만료시켜 삭제한다.
+        **동작**: 게임 인스턴스를 생성한다(빌드와 연결).
 
 
-      **Request**
+        **Request**
 
-      - 없음(쿠키만)
+        - `projectId` (path)
+
+        - `{ name, gameBuildId, ... }`
 
 
-      **Response**
+        **Response**
 
-      - `200`: 로그아웃 완료'
-  method: POST
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-- url: '{{ _.stage_orch_base_url }}/api/projects'
-  name: GET /api/projects — 프로젝트 목록 조회
+        - `201`: 생성된 인스턴스'
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"name": "개발 PC 1", "platform": "UNITY"}'
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/game-instances'
+    name: GET /api/projects/{projectId}/game-instances — 게임 인스턴스 목록
+    meta:
+      id: req_orch_instance_list
+      created: 1784859817000
+      modified: 1784859817000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: 프로젝트의 게임 인스턴스를 나열한다.
+
+
+        **Request**
+
+        - `projectId` (path)
+
+
+        **Response**
+
+        - `200`: 인스턴스 목록'
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/game-instances/{% prompt ''Instance ID'', ''myInstanceId'', ''Instance ID'', '''', ''myInstanceId'' %}'
+    name: PATCH /api/projects/{projectId}/game-instances/{instanceId} — 게임 인스턴스 이름 수정
+    meta:
+      id: req_orch_instance_patch
+      created: 1784859818000
+      modified: 1784859818000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: 게임 인스턴스의 이름을 수정한다.
+
+
+        **Request**
+
+        - `projectId`, `instanceId` (path)
+
+        - `{ name }`
+
+
+        **Response**
+
+        - `200`: 수정된 인스턴스'
+    method: PATCH
+    body:
+      mimeType: application/json
+      text: '{"name": "빌드 서버"}'
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/game-instances/{% prompt ''Instance ID'', ''myInstanceId'', ''Instance ID'', '''', ''myInstanceId'' %}'
+    name: DELETE /api/projects/{projectId}/game-instances/{instanceId} — 게임 인스턴스 삭제
+    meta:
+      id: req_orch_instance_delete
+      created: 1784859819000
+      modified: 1784859819000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: 게임 인스턴스를 삭제한다.
+
+
+        **Request**
+
+        - `projectId`, `instanceId` (path)
+
+
+        **Response**
+
+        - `204`: 삭제 완료'
+    method: DELETE
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+- name: SDK · 내부(permitAll)
   meta:
-    id: req_orch_project_list
+    id: fld_orch_sdk_internal
     created: 1784859805000
     modified: 1784859805000
-    isPrivate: false
-    description: '**호출 주체**: FE 대시보드 → Orchestration
+  children:
+  - url: '{{ _.stage_orch_base_url }}/api/sdk/registrations'
+    name: POST /api/sdk/registrations — SDK 인스턴스 등록
+    meta:
+      id: req_orch_sdk_register
+      created: 1784859820000
+      modified: 1784859820000
+      isPrivate: false
+      description: '**호출 주체**: 게임 SDK → Orchestration (내부, permitAll — 엔드유저 JWT 아님)
 
 
-      **동작**: 내가 멤버로 속한 프로젝트를 페이지네이션으로 조회한다. 각 항목에 최신 기획서/문서 수 등 요약을 포함한다(N+1 회피 위해 일괄 조회).
+        **동작**: 실행 중인 게임 인스턴스를 등록해 SessionManager에 인스턴스↔세션을 매핑한다. 이후 액션 전달의 대상이 된다.
 
 
-      **Request**
+        **Request**
 
-      - `page` (query, 선택): 0-base 페이지
-
-      - `size` (query, 선택): 페이지 크기
+        - `{ instanceId, ... }`
 
 
-      **Response**
+        **Response**
 
-      - `200`: `{ items: [ { id, name, genre, latestDocument?, documentCount, ... } ], page, size, total }`
+        - `200`: 등록 완료
 
 
-      **활용**: 대시보드의 프로젝트 카드 목록을 그린다.'
-  method: GET
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/projects'
-  name: POST /api/projects — 프로젝트 등록
+        **참고**: 내부 통신 경로라 사용자 인증을 요구하지 않는다.'
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"instanceKey": "{{ _.instance_key }}", "sdkUuid": "550e8400-e29b-41d4-a716-446655440000", "gameVersion": "1.2.3"}'
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: '{{ _.stage_orch_base_url }}/api/orchestration/action/{% prompt ''Instance ID'', ''myInstanceId'', ''Instance ID'', '''', ''myInstanceId'' %}'
+    name: POST /api/orchestration/action/{instanceId} — 게임 인스턴스 액션 전달
+    meta:
+      id: req_orch_action
+      created: 1784859821000
+      modified: 1784859821000
+      isPrivate: false
+      description: '**호출 주체**: 내부(Agent/서버) → Orchestration (permitAll)
+
+
+        **동작**: 대상 인스턴스로 액션을 전달한다. Orchestration은 SessionManager에서 인스턴스의 WS 세션을 찾아 SDK로 push한다.
+
+
+        **Request**
+
+        - `instanceId` (path)
+
+        - `{ action payload }`
+
+
+        **Response**
+
+        - `200`: 전달 완료
+
+        - 대상 세션 없음 시 오류
+
+
+        **참고**: 내부 통신 경로(permitAll).'
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"type": "ACTION", "id": 1, "actions": [{"id": 1, "jsonrpc": "2.0", "method": "click", "params": [100, 200]}]}'
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+- name: Test Scenario
   meta:
-    id: req_orch_project_create
+    id: fld_orch_testscenario
     created: 1784859806000
     modified: 1784859806000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
+  children:
+  - url: '{{ _.stage_orch_base_url }}/api/test-scenario'
+    name: POST /api/test-scenario — 테스트 시나리오 생성
+    meta:
+      id: req_orch_scenario_create
+      created: 1784859822000
+      modified: 1784859822000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
 
 
-      **동작**: 프로젝트를 생성하고 요청자를 OWNER 멤버로 등록한다.
+        **동작**: 프로젝트에 새 테스트 시나리오를 만들고 Agent 저작 세션(`/sessions`)을 연다. (userId:testScenarioId 매핑)
 
 
-      **Request**
+        **Request**
 
-      - `name` (string, 필수)
-
-      - `genre` (string, 필수)
-
-      - `description` (string, 선택)
+        - `{ projectId }`
 
 
-      **Response**
+        **Response**
 
-      - `201`: `{ projectId }`
+        - `200`: `{ testScenarioId }`
+
+        - `404`: 프로젝트 비참여자/미존재
 
 
-      **활용**: 반환된 `projectId`를 이후 기획서/시나리오/인스턴스 요청의 경로 키로 쓴다.'
-  method: POST
-  body:
-    mimeType: application/json
-    text: '{"name": "My Game", "description": "테스트 게임 프로젝트"}'
-  headers:
-  - name: Content-Type
-    value: application/json
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}'
-  name: GET /api/projects/{projectId} — 프로젝트 단일 조회
+        **활용**: 반환된 `testScenarioId`로 SSE 구독을 시작하고 메시지를 주고받는다.'
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"projectId": {% prompt "Project ID", "myProjectId", "Project ID", "", "1" %}}'
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}'
+    name: GET /api/test-scenario/{testScenarioId} — 테스트 시나리오 payload 조회
+    meta:
+      id: req_orch_scenario_get
+      created: 1784859823000
+      modified: 1784859823000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: 시나리오의 현재 payload(draft/확정본)를 조회한다.
+
+
+        **Request**
+
+        - `testScenarioId` (path)
+
+
+        **Response**
+
+        - `200`: 시나리오 payload
+
+        - `404`: 비참여자/미존재'
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}/messages'
+    name: GET /api/test-scenario/{testScenarioId}/messages — 테스트 시나리오 채팅 조회
+    meta:
+      id: req_orch_scenario_messages
+      created: 1784859824000
+      modified: 1784859824000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: 해당 시나리오 저작 세션의 채팅 스레드를 조회한다.
+
+
+        **Request**
+
+        - `testScenarioId` (path)
+
+
+        **Response**
+
+        - `200`: 메시지 목록'
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}/message'
+    name: POST /api/test-scenario/{testScenarioId}/message — 테스트 시나리오 메시지 전송
+    meta:
+      id: req_orch_scenario_message_send
+      created: 1784859825000
+      modified: 1784859825000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: 저작 챗봇에 사용자 메시지를 보낸다. Orchestration이 Agent WS로 전달하고, 응답은 SSE로 스트리밍된다.
+
+
+        **Request**
+
+        - `testScenarioId` (path)
+
+        - `{ content }`
+
+
+        **Response**
+
+        - `200`: 접수됨(본문은 SSE로 수신)
+
+
+        **활용**: 전송 전 SSE(`/stream`)를 먼저 구독해 응답 토큰을 받는다.'
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"type": "user_input", "testScenarioMessage": "1단계를 더 자세히 설명해줘"}'
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}/stream'
+    name: GET /api/test-scenario/{testScenarioId}/stream — 테스트 시나리오 SSE 구독
+    meta:
+      id: req_orch_scenario_sse
+      created: 1784859826000
+      modified: 1784859826000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: `text/event-stream`으로 저작 세션 이벤트(챗봇 응답 토큰, 상태, close)를 스트리밍한다. Agent WS→Orchestration Sink→FE로 흐른다.
+
+
+        **Request**
+
+        - `testScenarioId` (path)
+
+        - `Accept: text/event-stream`
+
+
+        **Response**
+
+        - `200`: SSE 스트림(승인/종료 시 closed 이벤트 후 종료)'
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}'
+    name: PUT /api/test-scenario/{testScenarioId} — 테스트 시나리오 자동저장(canvas 편집)
+    meta:
+      id: req_orch_scenario_update
+      created: 1784859827000
+      modified: 1784859827000
+      isPrivate: false
+      description: '**호출 주체**: FE canvas(드래그·편집) → Orchestration
+
+
+        **동작**: 사용자가 편집 중인 draft를 저장한다. FE는 debounce(마이크로 배치)로 이 PUT을 호출해 편집 상태를 서버와 맞춘다(R2DBC 저장).
+
+
+        **Request**
+
+        - `testScenarioId` (path)
+
+        - `{ draft: ScenarioDraft }`
+
+
+        **Response**
+
+        - `200`: 저장 완료
+
+        - `404`: 비참여자/미존재'
+    method: PUT
+    body:
+      mimeType: application/json
+      text: "{\n  \"draft\": {\n    \"title\": \"튜토리얼 진행 검증\",\n    \"description\": \"메인→인게임\",\n    \"steps\": [\n      {\"step\": 1, \"title\": \"게임 시작\", \"state\": \"메인 메뉴\", \"action\": \"시작 버튼 클릭\", \"expected\": \"인게임 진입\"}\n    ]\n  }\n}"
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}/approve'
+    name: POST /api/test-scenario/{testScenarioId}/approve — 테스트 시나리오 승인(확정)
+    meta:
+      id: req_orch_scenario_approve
+      created: 1784859828000
+      modified: 1784859828000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: 편집을 마치고 시나리오를 확정한다. body의 draft(있으면)를 최종 payload로 저장하고, Agent WS로 `{type:close}`를 보내 세션을 종료하며 FE SSE도 닫는다. 채팅·시나리오는 남는다.
+
+
+        **Request**
+
+        - `testScenarioId` (path)
+
+        - `{ draft?: ScenarioDraft }`
+
+
+        **Response**
+
+        - `200`: 승인 완료
+
+        - `404`: 비참여자/미존재'
+    method: POST
+    body:
+      mimeType: application/json
+      text: "{\n  \"draft\": {\n    \"title\": \"최종본\",\n    \"description\": \"확정된 시나리오\",\n    \"steps\": [\n      {\"step\": 1, \"title\": \"게임 시작\", \"state\": \"메인 메뉴\", \"action\": \"시작 버튼 클릭\", \"expected\": \"인게임 진입\"}\n    ]\n  }\n}"
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''1'' %}/test-scenario'
+    name: GET /api/projects/{projectId}/test-scenario — 프로젝트 시나리오 목록 조회
+    meta:
+      id: req_orch_scenario_list
+      created: 1784859829000
+      modified: 1784859829000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: 프로젝트에 속한 테스트 시나리오를 나열한다(priority·상태·최근 실행 상태 등 요약 포함).
+
+
+        **Request**
+
+        - `projectId` (path)
+
+
+        **Response**
+
+        - `200`: `{ items: [ { testScenarioId, title, priority, lastRunState, ... } ] }`
+
+        - `404`: 비참여자/미존재'
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''1'' %}/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}'
+    name: GET /api/projects/{projectId}/test-scenario/{testScenarioId} — 프로젝트 시나리오 단건 조회
+    meta:
+      id: req_orch_scenario_get_in_project
+      created: 1784859830000
+      modified: 1784859830000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: 프로젝트 스코프에서 시나리오 하나를 상세 조회한다.
+
+
+        **Request**
+
+        - `projectId`, `testScenarioId` (path)
+
+
+        **Response**
+
+        - `200`: 시나리오 상세
+
+        - `404`: 비참여자/미존재'
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+- name: Reference Context
   meta:
-    id: req_orch_project_get
+    id: fld_orch_referencecontext
     created: 1784859807000
     modified: 1784859807000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
+  children:
+  - url: '{{ _.stage_orch_base_url }}/api/orchestration/reference-context'
+    name: PUT /api/orchestration/reference-context — 참고자료 컨텍스트 저장(추출 적재)
+    meta:
+      id: req_orch_refctx_store
+      created: 1784859900000
+      modified: 1784859900000
+      isPrivate: false
+      description: '**호출 주체**: Agent/추출 파이프라인 → Orchestration (내부, permitAll)
 
 
-      **동작**: 멤버인 프로젝트 하나를 조회한다. 비멤버/미존재는 구분 없이 감춘다.
+        **동작**: 문서에서 추출한 game_context를 타입별로 저장한다. 한 문서(sourceDocumentId)의 game_context를 8개 타입(overview·screens·mechanics·entities·progression·flows·glossary·misc) 행으로 분해해 reference_context에 넣는다. 같은 (projectId, sourceDocumentId) 재호출 시 그 문서분만 교체(멱등)하고, 적재 완료 시 project_document.parse_status를 EXTRACTED로 갱신한다.
 
 
-      **Request**
+        **Request**
 
-      - `projectId` (path)
+        - `projectId` (number, 필수)
 
+        - `sourceDocumentId` (number, 필수): project_document.id (원본 S3 추적 키)
 
-      **Response**
+        - `gameContext` (object, 필수): Agent `/extract` 산출물 그대로
 
-      - `200`: 프로젝트 상세
 
-      - `404`: 비참여자 또는 미존재'
-  method: GET
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}'
-  name: PATCH /api/projects/{projectId} — 프로젝트 수정
-  meta:
-    id: req_orch_project_patch
-    created: 1784859808000
-    modified: 1784859808000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
+        **Response**
 
+        - `204`: 저장 완료
 
-      **동작**: 프로젝트 메타(name/description/genre)를 부분 수정한다.
+        - `400`: 본문 형식 오류
 
 
-      **Request**
+        **활용**: Agent가 `/extract`로 뽑은 game_context를 이 API로 push하면, 이후 조회 API로 타입별 참고한다.'
+    method: PUT
+    body:
+      mimeType: application/json
+      text: "{\n  \"projectId\": 1,\n  \"sourceDocumentId\": 10,\n  \"gameContext\": {\n    \"overview\": { \"title\": \"Word Online\", \"genre\": \"card battle\", \"core_loop\": \"select-combine-cast\" },\n    \"mechanics\": [ { \"name\": \"Card System\", \"rules\": [\"one magic + one attribute\"] } ],\n    \"entities\": [ { \"name\": \"Magic Card\", \"type\": \"item\", \"attributes\": [\"action: summon\"] } ]\n  }\n}"
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: '{{ _.stage_orch_base_url }}/api/orchestration/reference-context'
+    name: GET /api/orchestration/reference-context — 참고자료 컨텍스트 타입별 조회
+    meta:
+      id: req_orch_refctx_query
+      created: 1784859901000
+      modified: 1784859901000
+      isPrivate: false
+      description: '**호출 주체**: Agent → Orchestration (내부, permitAll)
 
-      - `projectId` (path)
 
-      - `{ name?, description?, genre? }`
+        **동작**: 프로젝트 스코프에서 특정 타입의 참고 컨텍스트(문서 전반)를 조회한다. 같은 타입이라도 문서마다 별개 항목이라 여러 문서 항목이 함께 담길 수 있다.
 
 
-      **Response**
+        **Request**
 
-      - `200`: 수정된 프로젝트
+        - `projectId` (query, 필수)
 
-      - `404`: 비참여자/미존재'
-  method: PATCH
-  body:
-    mimeType: application/json
-    text: '{"name": "Renamed Project"}'
-  headers:
-  - name: Content-Type
-    value: application/json
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}'
-  name: DELETE /api/projects/{projectId} — 프로젝트 삭제
-  meta:
-    id: req_orch_project_delete
-    created: 1784859809000
-    modified: 1784859809000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
+        - `type` (query, 필수): overview|screens|mechanics|entities|progression|flows|glossary|misc
 
 
-      **동작**: 프로젝트를 soft delete(`deleted_at`)한다. 목록/조회에서 제외된다.
+        **Response**
 
+        - `200`: `{ items: [ { sourceDocumentId, type, content } ] }` (content = overview는 객체, 나머지는 배열)
 
-      **Request**
 
-      - `projectId` (path)
-
-
-      **Response**
-
-      - `204`: 삭제 완료
-
-      - `404`: 비참여자/미존재'
-  method: DELETE
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/documents/upload-url'
-  name: POST /api/projects/{projectId}/documents/upload-url — 기획서 업로드 URL 발급
-  meta:
-    id: req_orch_doc_upload
-    created: 1784859810000
-    modified: 1784859810000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
-
-
-      **동작**: S3 presigned **PUT** URL을 발급한다. FE는 이 URL로 파일을 S3에 직접 올린다. PDF만 허용하며 object_key는 서버가 정한다.
-
-
-      **Request**
-
-      - `projectId` (path)
-
-      - `fileName` (string, 필수)
-
-      - `sizeBytes` (number, 필수)
-
-
-      **Response**
-
-      - `200`: `{ objectKey, url }` (url = presigned PUT)
-
-
-      **활용**: S3 PUT 성공 후 `objectKey`로 업로드 확정(등록) 요청을 보낸다.'
-  method: POST
-  body:
-    mimeType: application/json
-    text: '{"fileName": "GDD_v1.pdf", "contentType": "application/pdf"}'
-  headers:
-  - name: Content-Type
-    value: application/json
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/documents'
-  name: POST /api/projects/{projectId}/documents — 기획서 업로드 확정(등록)
-  meta:
-    id: req_orch_doc_upload_confirm
-    created: 1784859811000
-    modified: 1784859811000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
-
-
-      **동작**: S3에 올라간 객체를 HEAD로 검증(존재·PDF 매직·경로)하고 project_document 행을 만든다. 같은 프로젝트에 다시 올리면 교체가 아니라 version이 증가한다.
-
-
-      **Request**
-
-      - `projectId` (path)
-
-      - `objectKey` (string, 필수): 업로드 URL 발급 때 받은 키
-
-
-      **Response**
-
-      - `201`: 등록된 문서 `{ id, version, fileName, parseStatus(PENDING), ... }`
-
-
-      **활용**: 이 문서(id)가 추출(/extract) → reference_context 적재의 출처(sourceDocumentId)가 된다.'
-  method: POST
-  body:
-    mimeType: application/json
-    text: '{"fileName": "GDD_v1.pdf", "s3Key": "projects/1/documents/abc-123/GDD_v1.pdf"}'
-  headers:
-  - name: Content-Type
-    value: application/json
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/documents'
-  name: GET /api/projects/{projectId}/documents — 기획서 이력 조회
-  meta:
-    id: req_orch_doc_list
-    created: 1784859812000
-    modified: 1784859812000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
-
-
-      **동작**: 프로젝트의 기획서 버전을 최신순으로 나열한다.
-
-
-      **Request**
-
-      - `projectId` (path)
-
-
-      **Response**
-
-      - `200`: `[ { id, version, fileName, uploadedAt, uploadedBy, parseStatus }, ... ]`
-
-
-      **참고**: `parseStatus`는 PENDING(업로드만) → EXTRACTED(reference_context 적재 완료).'
-  method: GET
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/documents/{% prompt ''Document ID'', ''myDocId'', ''Document ID'', '''', ''myDocId'' %}/download-url'
-  name: GET /api/projects/{projectId}/documents/{documentId}/download-url — 기획서 다운로드 URL 발급
-  meta:
-    id: req_orch_doc_download
-    created: 1784859813000
-    modified: 1784859813000
-    isPrivate: false
-    description: '**호출 주체**: FE, 그리고 추출 파이프라인 → Orchestration
-
-
-      **동작**: 원본 PDF의 presigned **GET** URL(TTL 5분)을 발급한다.
-
-
-      **Request**
-
-      - `projectId`, `documentId` (path)
-
-
-      **Response**
-
-      - `200`: `{ url }` (presigned GET, 서명값 `X-Amz-Signature` 포함)
-
-
-      **활용**: 같은 URL을 Agent `/extract`의 `source_url`로 넘긴다. 자격증명 없는 배포에선 서명 없는 URL이 나오므로 서명 유무를 확인한다.'
-  method: GET
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/game-builds'
-  name: GET /api/projects/{projectId}/game-builds — 게임 빌드 목록
-  meta:
-    id: req_orch_build_list
-    created: 1784859814000
-    modified: 1784859814000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
-
-
-      **동작**: 프로젝트의 게임 빌드를 나열한다.
-
-
-      **Request**
-
-      - `projectId` (path)
-
-
-      **Response**
-
-      - `200`: 빌드 목록'
-  method: GET
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/game-builds/{% prompt ''Build ID'', ''myBuildId'', ''Build ID'', '''', ''myBuildId'' %}'
-  name: PATCH /api/projects/{projectId}/game-builds/{buildId} — 게임 빌드 설명 수정
-  meta:
-    id: req_orch_build_patch
-    created: 1784859815000
-    modified: 1784859815000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
-
-
-      **동작**: 특정 게임 빌드의 설명을 수정한다.
-
-
-      **Request**
-
-      - `projectId`, `buildId` (path)
-
-      - `{ description }`
-
-
-      **Response**
-
-      - `200`: 수정된 빌드'
-  method: PATCH
-  body:
-    mimeType: application/json
-    text: '{"label": "v1.2.3 stable", "notes": "QA 승인 완료"}'
-  headers:
-  - name: Content-Type
-    value: application/json
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/game-instances'
-  name: POST /api/projects/{projectId}/game-instances — 게임 인스턴스 생성
-  meta:
-    id: req_orch_instance_create
-    created: 1784859816000
-    modified: 1784859816000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
-
-
-      **동작**: 게임 인스턴스를 생성한다(빌드와 연결).
-
-
-      **Request**
-
-      - `projectId` (path)
-
-      - `{ name, gameBuildId, ... }`
-
-
-      **Response**
-
-      - `201`: 생성된 인스턴스'
-  method: POST
-  body:
-    mimeType: application/json
-    text: '{"name": "개발 PC 1", "platform": "UNITY"}'
-  headers:
-  - name: Content-Type
-    value: application/json
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/game-instances'
-  name: GET /api/projects/{projectId}/game-instances — 게임 인스턴스 목록
-  meta:
-    id: req_orch_instance_list
-    created: 1784859817000
-    modified: 1784859817000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
-
-
-      **동작**: 프로젝트의 게임 인스턴스를 나열한다.
-
-
-      **Request**
-
-      - `projectId` (path)
-
-
-      **Response**
-
-      - `200`: 인스턴스 목록'
-  method: GET
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/game-instances/{% prompt ''Instance ID'', ''myInstanceId'', ''Instance ID'', '''', ''myInstanceId'' %}'
-  name: PATCH /api/projects/{projectId}/game-instances/{instanceId} — 게임 인스턴스 이름 수정
-  meta:
-    id: req_orch_instance_patch
-    created: 1784859818000
-    modified: 1784859818000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
-
-
-      **동작**: 게임 인스턴스의 이름을 수정한다.
-
-
-      **Request**
-
-      - `projectId`, `instanceId` (path)
-
-      - `{ name }`
-
-
-      **Response**
-
-      - `200`: 수정된 인스턴스'
-  method: PATCH
-  body:
-    mimeType: application/json
-    text: '{"name": "빌드 서버"}'
-  headers:
-  - name: Content-Type
-    value: application/json
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''myProjectId'' %}/game-instances/{% prompt ''Instance ID'', ''myInstanceId'', ''Instance ID'', '''', ''myInstanceId'' %}'
-  name: DELETE /api/projects/{projectId}/game-instances/{instanceId} — 게임 인스턴스 삭제
-  meta:
-    id: req_orch_instance_delete
-    created: 1784859819000
-    modified: 1784859819000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
-
-
-      **동작**: 게임 인스턴스를 삭제한다.
-
-
-      **Request**
-
-      - `projectId`, `instanceId` (path)
-
-
-      **Response**
-
-      - `204`: 삭제 완료'
-  method: DELETE
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/sdk/registrations'
-  name: POST /api/sdk/registrations — SDK 인스턴스 등록
-  meta:
-    id: req_orch_sdk_register
-    created: 1784859820000
-    modified: 1784859820000
-    isPrivate: false
-    description: '**호출 주체**: 게임 SDK → Orchestration (내부, permitAll — 엔드유저 JWT 아님)
-
-
-      **동작**: 실행 중인 게임 인스턴스를 등록해 SessionManager에 인스턴스↔세션을 매핑한다. 이후 액션 전달의 대상이 된다.
-
-
-      **Request**
-
-      - `{ instanceId, ... }`
-
-
-      **Response**
-
-      - `200`: 등록 완료
-
-
-      **참고**: 내부 통신 경로라 사용자 인증을 요구하지 않는다.'
-  method: POST
-  body:
-    mimeType: application/json
-    text: '{"instanceKey": "{{ _.instance_key }}", "sdkUuid": "550e8400-e29b-41d4-a716-446655440000", "gameVersion": "1.2.3"}'
-  headers:
-  - name: Content-Type
-    value: application/json
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-- url: '{{ _.stage_orch_base_url }}/api/orchestration/action/{% prompt ''Instance ID'', ''myInstanceId'', ''Instance ID'', '''', ''myInstanceId'' %}'
-  name: POST /api/orchestration/action/{instanceId} — 게임 인스턴스 액션 전달
-  meta:
-    id: req_orch_action
-    created: 1784859821000
-    modified: 1784859821000
-    isPrivate: false
-    description: '**호출 주체**: 내부(Agent/서버) → Orchestration (permitAll)
-
-
-      **동작**: 대상 인스턴스로 액션을 전달한다. Orchestration은 SessionManager에서 인스턴스의 WS 세션을 찾아 SDK로 push한다.
-
-
-      **Request**
-
-      - `instanceId` (path)
-
-      - `{ action payload }`
-
-
-      **Response**
-
-      - `200`: 전달 완료
-
-      - 대상 세션 없음 시 오류
-
-
-      **참고**: 내부 통신 경로(permitAll).'
-  method: POST
-  body:
-    mimeType: application/json
-    text: '{"type": "ACTION", "id": 1, "actions": [{"id": 1, "jsonrpc": "2.0", "method": "click", "params": [100, 200]}]}'
-  headers:
-  - name: Content-Type
-    value: application/json
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-- url: '{{ _.stage_orch_base_url }}/api/test-scenario'
-  name: POST /api/test-scenario — 테스트 시나리오 생성
-  meta:
-    id: req_orch_scenario_create
-    created: 1784859822000
-    modified: 1784859822000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
-
-
-      **동작**: 프로젝트에 새 테스트 시나리오를 만들고 Agent 저작 세션(`/sessions`)을 연다. (userId:testScenarioId 매핑)
-
-
-      **Request**
-
-      - `{ projectId }`
-
-
-      **Response**
-
-      - `200`: `{ testScenarioId }`
-
-      - `404`: 프로젝트 비참여자/미존재
-
-
-      **활용**: 반환된 `testScenarioId`로 SSE 구독을 시작하고 메시지를 주고받는다.'
-  method: POST
-  body:
-    mimeType: application/json
-    text: '{"projectId": {% prompt "Project ID", "myProjectId", "Project ID", "", "1" %}}'
-  headers:
-  - name: Content-Type
-    value: application/json
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}'
-  name: GET /api/test-scenario/{testScenarioId} — 테스트 시나리오 payload 조회
-  meta:
-    id: req_orch_scenario_get
-    created: 1784859823000
-    modified: 1784859823000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
-
-
-      **동작**: 시나리오의 현재 payload(draft/확정본)를 조회한다.
-
-
-      **Request**
-
-      - `testScenarioId` (path)
-
-
-      **Response**
-
-      - `200`: 시나리오 payload
-
-      - `404`: 비참여자/미존재'
-  method: GET
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}/messages'
-  name: GET /api/test-scenario/{testScenarioId}/messages — 테스트 시나리오 채팅 조회
-  meta:
-    id: req_orch_scenario_messages
-    created: 1784859824000
-    modified: 1784859824000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
-
-
-      **동작**: 해당 시나리오 저작 세션의 채팅 스레드를 조회한다.
-
-
-      **Request**
-
-      - `testScenarioId` (path)
-
-
-      **Response**
-
-      - `200`: 메시지 목록'
-  method: GET
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}/message'
-  name: POST /api/test-scenario/{testScenarioId}/message — 테스트 시나리오 메시지 전송
-  meta:
-    id: req_orch_scenario_message_send
-    created: 1784859825000
-    modified: 1784859825000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
-
-
-      **동작**: 저작 챗봇에 사용자 메시지를 보낸다. Orchestration이 Agent WS로 전달하고, 응답은 SSE로 스트리밍된다.
-
-
-      **Request**
-
-      - `testScenarioId` (path)
-
-      - `{ content }`
-
-
-      **Response**
-
-      - `200`: 접수됨(본문은 SSE로 수신)
-
-
-      **활용**: 전송 전 SSE(`/stream`)를 먼저 구독해 응답 토큰을 받는다.'
-  method: POST
-  body:
-    mimeType: application/json
-    text: '{"type": "user_input", "testScenarioMessage": "1단계를 더 자세히 설명해줘"}'
-  headers:
-  - name: Content-Type
-    value: application/json
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}/stream'
-  name: GET /api/test-scenario/{testScenarioId}/stream — 테스트 시나리오 SSE 구독
-  meta:
-    id: req_orch_scenario_sse
-    created: 1784859826000
-    modified: 1784859826000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
-
-
-      **동작**: `text/event-stream`으로 저작 세션 이벤트(챗봇 응답 토큰, 상태, close)를 스트리밍한다. Agent WS→Orchestration Sink→FE로 흐른다.
-
-
-      **Request**
-
-      - `testScenarioId` (path)
-
-      - `Accept: text/event-stream`
-
-
-      **Response**
-
-      - `200`: SSE 스트림(승인/종료 시 closed 이벤트 후 종료)'
-  method: GET
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}'
-  name: PUT /api/test-scenario/{testScenarioId} — 테스트 시나리오 자동저장(canvas 편집)
-  meta:
-    id: req_orch_scenario_update
-    created: 1784859827000
-    modified: 1784859827000
-    isPrivate: false
-    description: '**호출 주체**: FE canvas(드래그·편집) → Orchestration
-
-
-      **동작**: 사용자가 편집 중인 draft를 저장한다. FE는 debounce(마이크로 배치)로 이 PUT을 호출해 편집 상태를 서버와 맞춘다(R2DBC 저장).
-
-
-      **Request**
-
-      - `testScenarioId` (path)
-
-      - `{ draft: ScenarioDraft }`
-
-
-      **Response**
-
-      - `200`: 저장 완료
-
-      - `404`: 비참여자/미존재'
-  method: PUT
-  body:
-    mimeType: application/json
-    text: "{\n  \"draft\": {\n    \"title\": \"튜토리얼 진행 검증\",\n    \"description\": \"메인→인게임\",\n    \"steps\": [\n      {\"step\": 1, \"title\": \"게임 시작\", \"state\": \"메인 메뉴\", \"action\": \"시작 버튼 클릭\", \"expected\": \"인게임 진입\"}\n    ]\n  }\n}"
-  headers:
-  - name: Content-Type
-    value: application/json
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}/approve'
-  name: POST /api/test-scenario/{testScenarioId}/approve — 테스트 시나리오 승인(확정)
-  meta:
-    id: req_orch_scenario_approve
-    created: 1784859828000
-    modified: 1784859828000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
-
-
-      **동작**: 편집을 마치고 시나리오를 확정한다. body의 draft(있으면)를 최종 payload로 저장하고, Agent WS로 `{type:close}`를 보내 세션을 종료하며 FE SSE도 닫는다. 채팅·시나리오는 남는다.
-
-
-      **Request**
-
-      - `testScenarioId` (path)
-
-      - `{ draft?: ScenarioDraft }`
-
-
-      **Response**
-
-      - `200`: 승인 완료
-
-      - `404`: 비참여자/미존재'
-  method: POST
-  body:
-    mimeType: application/json
-    text: "{\n  \"draft\": {\n    \"title\": \"최종본\",\n    \"description\": \"확정된 시나리오\",\n    \"steps\": [\n      {\"step\": 1, \"title\": \"게임 시작\", \"state\": \"메인 메뉴\", \"action\": \"시작 버튼 클릭\", \"expected\": \"인게임 진입\"}\n    ]\n  }\n}"
-  headers:
-  - name: Content-Type
-    value: application/json
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''1'' %}/test-scenario'
-  name: GET /api/projects/{projectId}/test-scenario — 프로젝트 시나리오 목록 조회
-  meta:
-    id: req_orch_scenario_list
-    created: 1784859829000
-    modified: 1784859829000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
-
-
-      **동작**: 프로젝트에 속한 테스트 시나리오를 나열한다(priority·상태·최근 실행 상태 등 요약 포함).
-
-
-      **Request**
-
-      - `projectId` (path)
-
-
-      **Response**
-
-      - `200`: `{ items: [ { testScenarioId, title, priority, lastRunState, ... } ] }`
-
-      - `404`: 비참여자/미존재'
-  method: GET
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''1'' %}/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}'
-  name: GET /api/projects/{projectId}/test-scenario/{testScenarioId} — 프로젝트 시나리오 단건 조회
-  meta:
-    id: req_orch_scenario_get_in_project
-    created: 1784859830000
-    modified: 1784859830000
-    isPrivate: false
-    description: '**호출 주체**: FE → Orchestration
-
-
-      **동작**: 프로젝트 스코프에서 시나리오 하나를 상세 조회한다.
-
-
-      **Request**
-
-      - `projectId`, `testScenarioId` (path)
-
-
-      **Response**
-
-      - `200`: 시나리오 상세
-
-      - `404`: 비참여자/미존재'
-  method: GET
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-  authentication:
-    type: bearer
-    token: '{{ _.stage_orch_jwt }}'
-- url: '{{ _.stage_orch_base_url }}/api/orchestration/reference-context'
-  name: PUT /api/orchestration/reference-context — 참고자료 컨텍스트 저장(추출 적재)
-  meta:
-    id: req_orch_refctx_store
-    created: 1784859900000
-    modified: 1784859900000
-    isPrivate: false
-    description: '**호출 주체**: Agent/추출 파이프라인 → Orchestration (내부, permitAll)
-
-
-      **동작**: 문서에서 추출한 game_context를 타입별로 저장한다. 한 문서(sourceDocumentId)의 game_context를 8개 타입(overview·screens·mechanics·entities·progression·flows·glossary·misc) 행으로 분해해 reference_context에 넣는다. 같은 (projectId, sourceDocumentId) 재호출 시 그 문서분만 교체(멱등)하고, 적재 완료 시 project_document.parse_status를 EXTRACTED로 갱신한다.
-
-
-      **Request**
-
-      - `projectId` (number, 필수)
-
-      - `sourceDocumentId` (number, 필수): project_document.id (원본 S3 추적 키)
-
-      - `gameContext` (object, 필수): Agent `/extract` 산출물 그대로
-
-
-      **Response**
-
-      - `204`: 저장 완료
-
-      - `400`: 본문 형식 오류
-
-
-      **활용**: Agent가 `/extract`로 뽑은 game_context를 이 API로 push하면, 이후 조회 API로 타입별 참고한다.'
-  method: PUT
-  body:
-    mimeType: application/json
-    text: "{\n  \"projectId\": 1,\n  \"sourceDocumentId\": 10,\n  \"gameContext\": {\n    \"overview\": { \"title\": \"Word Online\", \"genre\": \"card battle\", \"core_loop\": \"select-combine-cast\" },\n    \"mechanics\": [ { \"name\": \"Card System\", \"rules\": [\"one magic + one attribute\"] } ],\n    \"entities\": [ { \"name\": \"Magic Card\", \"type\": \"item\", \"attributes\": [\"action: summon\"] } ]\n  }\n}"
-  headers:
-  - name: Content-Type
-    value: application/json
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
-- url: '{{ _.stage_orch_base_url }}/api/orchestration/reference-context'
-  name: GET /api/orchestration/reference-context — 참고자료 컨텍스트 타입별 조회
-  meta:
-    id: req_orch_refctx_query
-    created: 1784859901000
-    modified: 1784859901000
-    isPrivate: false
-    description: '**호출 주체**: Agent → Orchestration (내부, permitAll)
-
-
-      **동작**: 프로젝트 스코프에서 특정 타입의 참고 컨텍스트(문서 전반)를 조회한다. 같은 타입이라도 문서마다 별개 항목이라 여러 문서 항목이 함께 담길 수 있다.
-
-
-      **Request**
-
-      - `projectId` (query, 필수)
-
-      - `type` (query, 필수): overview|screens|mechanics|entities|progression|flows|glossary|misc
-
-
-      **Response**
-
-      - `200`: `{ items: [ { sourceDocumentId, type, content } ] }` (content = overview는 객체, 나머지는 배열)
-
-
-      **활용**: Agent가 QA 판단 시 필요한 타입만 뽑아 참고한다.'
-  method: GET
-  parameters:
-  - name: projectId
-    value: '1'
-  - name: type
-    value: mechanics
-  settings:
-    renderRequestBody: true
-    encodeUrl: true
-    followRedirects: global
-    cookies:
-      send: true
-      store: true
-    rebuildPath: true
+        **활용**: Agent가 QA 판단 시 필요한 타입만 뽑아 참고한다.'
+    method: GET
+    parameters:
+    - name: projectId
+      value: '1'
+    - name: type
+      value: mechanics
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
 cookieJar:
   name: Default Jar
   meta:
