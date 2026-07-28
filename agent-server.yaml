@@ -164,7 +164,7 @@ collection:
       description: |-
         **호출 주체**: Orchestration → Agent Server (무상태, 세션 없음)
 
-        **동작**: `source_url`을 httpx로 직접 GET해 문서 바이트를 받고, 확장자/Content-Type으로 로더를 골라(pdf는 pdfplumber, txt·md는 디코드) 평문으로 만든 뒤 LLM에 넘겨 구조화된 `game_context`를 뽑는다.
+        **동작**: `source_url`을 httpx로 직접 GET해 문서 바이트를 받고, 확장자/Content-Type으로 로더를 골라(pdf는 pdfplumber, txt·md는 디코드) 평문으로 만든 뒤 LLM에 넘겨 knowledge 항목 리스트(`game_context`)를 뽑는다. ⚠️ **응답 형태가 바뀌었다**: 기존 8섹션 고정 객체 → 평평한 `{ tag, summary, description }` 리스트.
 
         **⚠️ 운영에서 source_url은 presigned GET URL이어야 한다.** Agent Server는 AWS 자격증명을 갖지 않고 익명 GET만 한다. 서명은 URL 쿼리스트링(`X-Amz-Signature` 등)에 들어 있고, S3는 그 서명을 만든 IAM 주체의 권한으로 접근을 허용한다. 그래서 접근 권한은 서명하는 쪽(Orchestration)이 갖고, 호출 직전에 발급한다.
 
@@ -188,12 +188,15 @@ collection:
         - `model` (enum, 선택): 기본 `openai/gpt-4o-mini`. `openai/gpt-4o`, `anthropic/claude-sonnet-5`, `anthropic/claude-opus-4.8`, `google/gemini-2.5-flash`, `google/gemini-2.5-pro`, `google/gemma-4-31b-it:free`
 
         **Response**
-        - `200`: `{ filename, game_context }`. `game_context`는 `overview`, `screens`, `mechanics`, `entities`, `progression`, `flows`, `glossary`, `misc` 8개 섹션 고정
+        - `200`: `{ source, metadata, game_context }`
+          - `source`: `"docs"` (Orchestration은 저장 시 `DOCS`로 확정)
+          - `metadata`: `{ filename, hash, id }` — ⚠️ 참고용. Orchestration은 `hash`를 **자체 계산값으로 덮고**, `source_id`는 자신이 아는 document id를 쓴다(응답값 불신)
+          - `game_context`: `[ { tag, summary, description } ]` 리스트. `tag` ∈ `CONTROL` | `RULE` | `OBJECTIVE` | `UI` | `MISC`. `summary`(짧은 요지)·`description`(상세)은 필수. 잘못된 tag/빈 필드 항목은 Orchestration이 저장에서 스킵
         - `415`: 지원하지 않는 포맷
         - `422`: 추출 결과가 스키마 검증 실패
         - `502`: 문서 fetch 실패(서명 없음·만료·크기 초과·타임아웃) 또는 LLM 오류
 
-        **활용**: 반환된 `game_context`를 Orchestration이 저장하고, 이후 시나리오 세션의 `game_context` 입력으로 재사용한다. 원본 PDF는 S3에 남고 presigned URL은 저장하지 않는다.
+        **활용**: 반환된 `game_context`를 Orchestration이 `knowledge`(source=DOCS)에 적재한다. 조회는 Orchestration `GET /api/knowledge`. 원본 PDF는 S3에 남고 presigned URL은 저장하지 않는다.
       sortKey: -1784697066598.5
     method: POST
     body:
