@@ -927,118 +927,6 @@ collection:
     authentication:
       type: bearer
       token: '{{ _.stage_orch_jwt }}'
-  - url: '{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}/messages'
-    name: GET /api/test-scenario/{testScenarioId}/messages — 테스트 시나리오 채팅 조회
-    meta:
-      id: req_orch_scenario_messages
-      created: 1784859824000
-      modified: 1784859824000
-      isPrivate: false
-      description: '**호출 주체**: FE → Orchestration
-
-
-        **동작**: 해당 시나리오 저작 세션의 채팅 스레드를 조회한다.
-
-
-        **Request**
-
-        - `testScenarioId` (path)
-
-
-        **Response**
-
-        - `200`: 메시지 목록'
-    method: GET
-    settings:
-      renderRequestBody: true
-      encodeUrl: true
-      followRedirects: global
-      cookies:
-        send: true
-        store: true
-      rebuildPath: true
-    authentication:
-      type: bearer
-      token: '{{ _.stage_orch_jwt }}'
-  - url: '{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}/message'
-    name: POST /api/test-scenario/{testScenarioId}/message — 테스트 시나리오 메시지 전송
-    meta:
-      id: req_orch_scenario_message_send
-      created: 1784859825000
-      modified: 1784859825000
-      isPrivate: false
-      description: '**호출 주체**: FE → Orchestration
-
-
-        **동작**: 저작 챗봇에 사용자 메시지를 보낸다. Orchestration이 Agent WS로 전달하고, 응답은 SSE로 스트리밍된다.
-
-
-        **Request**
-
-        - `testScenarioId` (path)
-
-        - `{ content }`
-
-
-        **Response**
-
-        - `200`: 접수됨(본문은 SSE로 수신)
-
-
-        **활용**: 전송 전 SSE(`/stream`)를 먼저 구독해 응답 토큰을 받는다.'
-    method: POST
-    body:
-      mimeType: application/json
-      text: '{"type": "user_input", "testScenarioMessage": "1단계를 더 자세히 설명해줘"}'
-    headers:
-    - name: Content-Type
-      value: application/json
-    settings:
-      renderRequestBody: true
-      encodeUrl: true
-      followRedirects: global
-      cookies:
-        send: true
-        store: true
-      rebuildPath: true
-    authentication:
-      type: bearer
-      token: '{{ _.stage_orch_jwt }}'
-  - url: '{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}/stream'
-    name: GET /api/test-scenario/{testScenarioId}/stream — 테스트 시나리오 SSE 구독
-    meta:
-      id: req_orch_scenario_sse
-      created: 1784859826000
-      modified: 1784859826000
-      isPrivate: false
-      description: '**호출 주체**: FE → Orchestration
-
-
-        **동작**: `text/event-stream`으로 저작 세션 이벤트(챗봇 응답 토큰, 상태, close)를 스트리밍한다. Agent WS→Orchestration Sink→FE로 흐른다.
-
-
-        **Request**
-
-        - `testScenarioId` (path)
-
-        - `Accept: text/event-stream`
-
-
-        **Response**
-
-        - `200`: SSE 스트림(승인/종료 시 closed 이벤트 후 종료)'
-    method: GET
-    settings:
-      renderRequestBody: true
-      encodeUrl: true
-      followRedirects: global
-      cookies:
-        send: true
-        store: true
-      rebuildPath: true
-    authentication:
-      type: bearer
-      token: '{{ _.stage_orch_jwt }}'
   - url: '{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}'
     name: PUT /api/test-scenario/{testScenarioId} — 테스트 시나리오 자동저장(canvas 편집)
     meta:
@@ -1256,6 +1144,37 @@ collection:
     headers:
     - name: Content-Type
       value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/test-scenario/{% prompt ''Scenario ID'', ''myScenarioId'', ''Scenario ID'', '''', ''myScenarioId'' %}'
+    name: DELETE /api/test-scenario/{testScenarioId} — 테스트 시나리오 삭제
+    meta:
+      id: req_orch_scenario_delete
+      created: 1784859835000
+      modified: 1784859835000
+      isPrivate: false
+      description: |-
+        **호출 주체**: FE → Orchestration
+
+        **동작**: 시나리오와 그 케이스 조합 링크(test_scenario_case)를 삭제한다. 재사용되는 케이스와 런 본체는 남긴다. 삭제는 사용자 수동 조작이며 저작 챗봇은 자동으로 삭제하지 않는다. (ARTEL-207)
+
+        **Request**
+        - `testScenarioId` (path)
+
+        **Response**
+        - `204`: 삭제 완료(본문 없음)
+        - `401`: 미인증
+        - `404`: 비참여자/미존재
+    method: DELETE
     settings:
       renderRequestBody: true
       encodeUrl: true
@@ -1754,6 +1673,177 @@ collection:
     headers:
     - name: Content-Type
       value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''1'' %}/test-runs/{% prompt ''Run ID'', ''myRunId'', ''Run ID'', '''', ''1'' %}/chat/messages'
+    name: GET /api/projects/{projectId}/test-runs/{runId}/chat/messages — 런 저작 채팅 조회
+    meta:
+      id: req_orch_testrun_chat_messages
+      created: 1784860017000
+      modified: 1784860017000
+      isPrivate: false
+      description: |-
+        **호출 주체**: FE → Orchestration
+
+        **동작**: 이 런의 사용자별 저작 대화 스레드를 조회한다(재방문 복원). 세션키는 userId:runId다. (ARTEL-206 Step 6 — 구 `/api/test-scenario/{id}/messages` 대체)
+
+        **Request**
+        - `projectId`, `runId` (path)
+
+        **Response**
+        - `200`: `[ { role, content, createdAt } ]`
+        - `401`: 미인증
+        - `404`: 비참여자/미존재
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''1'' %}/test-runs/{% prompt ''Run ID'', ''myRunId'', ''Run ID'', '''', ''1'' %}/chat/stream'
+    name: GET /api/projects/{projectId}/test-runs/{runId}/chat/stream — 런 저작 채팅 SSE 구독
+    meta:
+      id: req_orch_testrun_chat_stream
+      created: 1784860018000
+      modified: 1784860018000
+      isPrivate: false
+      description: |-
+        **호출 주체**: FE → Orchestration
+
+        **동작**: `text/event-stream`으로 Agent 응답을 실시간 수신한다. 이벤트 봉투 `ScenarioStreamEvent` — `type=result`면 `{ message, scenarios: [ { scenario_id, title, description, case_ids } ] }`(빈 `scenarios[]`는 질문·거절·무매치 같은 정상 턴), `type=error`면 `{ code, detail }`. (ARTEL-206 Step 6 — 구 `/api/test-scenario/{id}/stream` 대체)
+
+        **Request**
+        - `projectId`, `runId` (path)
+        - `Accept: text/event-stream`
+
+        **Response**
+        - `200`: SSE 스트림
+        - `401`: 미인증
+        - `404`: 비참여자/미존재
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''1'' %}/test-runs/{% prompt ''Run ID'', ''myRunId'', ''Run ID'', '''', ''1'' %}/chat/message'
+    name: POST /api/projects/{projectId}/test-runs/{runId}/chat/message — 런 저작 채팅 메시지 전송
+    meta:
+      id: req_orch_testrun_chat_send
+      created: 1784860019000
+      modified: 1784860019000
+      isPrivate: false
+      description: |-
+        **호출 주체**: FE → Orchestration
+
+        **동작**: 사용자 자연어를 Agent WS로 중계한다. 응답은 SSE(`chat/stream`)로 흐른다. 한 번의 요청으로 여러 시나리오를 추가·수정할 수 있고(`scenario_id` null=추가, 있으면 수정), 어떤 시나리오를 손댈지는 Agent가 판단한다. (ARTEL-206 Step 6 — 구 `/api/test-scenario/{id}/message` 대체)
+
+        **Request**
+        - `projectId`, `runId` (path)
+        - `{ message: string, autoApply?: boolean }` — `autoApply=true`(기본)면 결과 즉시 반영(자동저장), `false`면 저장 않고 카드 제안으로만 둠(카드 검토 모드)
+
+        **Response**
+        - `200`: `"메시지 전송 완료"`(본문은 SSE로 수신)
+        - `401`: 미인증
+        - `404`: 비참여자/미존재
+        - `502`: Agent 전송 실패
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"message": "상점에서 아이템을 구매하는 시나리오를 추가해줘", "autoApply": true}'
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''1'' %}/test-runs/{% prompt ''Run ID'', ''myRunId'', ''Run ID'', '''', ''1'' %}/scenarios/commit'
+    name: POST /api/projects/{projectId}/test-runs/{runId}/scenarios/commit — 카드 검토 커밋(추가/수정)
+    meta:
+      id: req_orch_testrun_scenarios_commit
+      created: 1784860020000
+      modified: 1784860020000
+      isPrivate: false
+      description: |-
+        **호출 주체**: FE → Orchestration
+
+        **동작**: 카드 검토 모드(autoApply off)에서 사용자가 카드로 고르거나 편집한 시나리오를 이 런에 반영한다. 자동저장과 같은 reconcile 엔진을 쓴다. `scenario_id`가 있으면 수정, 없으면 추가. 빈 배열은 무동작(삭제로 오인 금지). (ARTEL-206 Step 6)
+
+        **Request**
+        - `projectId`, `runId` (path)
+        - `{ scenarios: [ { scenario_id?: number, title, description, case_ids: number[] } ] }`
+
+        **Response**
+        - `200`: 반영 후 런의 시나리오 조합 `{ testRunId, items: [ { position, testScenarioId } ] }`
+        - `401`: 미인증
+        - `404`: 비참여자/미존재
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"scenarios": [{"title": "상점 구매", "description": "상점에서 아이템을 구매한다", "case_ids": [10, 11]}]}'
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''1'' %}/test-runs/{% prompt ''Run ID'', ''myRunId'', ''Run ID'', '''', ''1'' %}/chat/close'
+    name: POST /api/projects/{projectId}/test-runs/{runId}/chat/close — 런 저작 세션 종료
+    meta:
+      id: req_orch_testrun_chat_close
+      created: 1784860021000
+      modified: 1784860021000
+      isPrivate: false
+      description: |-
+        **호출 주체**: FE → Orchestration
+
+        **동작**: 런 편집 화면을 벗어날 때 저작 세션(Agent WS/SSE)을 정리한다. 대화 로그·시나리오는 보존한다. (ARTEL-206 Step 6)
+
+        **Request**
+        - `projectId`, `runId` (path)
+
+        **Response**
+        - `200`: `"세션 종료 완료"`
+        - `401`: 미인증
+        - `404`: 비참여자/미존재
+    method: POST
     settings:
       renderRequestBody: true
       encodeUrl: true
