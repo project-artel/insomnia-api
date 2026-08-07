@@ -1165,16 +1165,28 @@ collection:
       description: |-
         **호출 주체**: FE → Orchestration
 
-        **동작**: 시나리오와 그 케이스 조합 링크(test_scenario_case)를 삭제한다. 재사용되는 케이스와 런 본체는 남긴다. 삭제는 사용자 수동 조작이며 저작 챗봇은 자동으로 삭제하지 않는다. (ARTEL-207)
+        **동작**: 시나리오와 그 조합 링크(test_scenario_case·test_run_scenario)를 삭제한다. **재사용 케이스(TestCase)와 런 본체는 삭제하지 않고** 조인 링크만 정리한다. 삭제는 사용자 수동 조작이며 저작 챗봇은 자동으로 삭제하지 않는다. (ARTEL-207, PR #91)
 
         **Request**
         - `testScenarioId` (path)
+        - `force` (query, Boolean, 기본 false): QA 실행 이력이 있어도 강제 삭제
+
+        **동작 규칙**
+        - 실행 이력(qa_try) 없음 → 삭제(204)
+        - 실행 이력 있음 + `force=false` → **409 `scenario_has_qa_history`** (실행 기록·발견 이슈 보호)
+        - 실행 이력 있음 + `force=true` → qa_try(+qa_log·issue CASCADE)까지 삭제 후 본체 삭제(204)
 
         **Response**
         - `204`: 삭제 완료(본문 없음)
         - `401`: 미인증
         - `404`: 비참여자/미존재
+        - `409`: `scenario_has_qa_history` — 실행 이력 존재(force로 재시도)
     method: DELETE
+    parameters:
+    - name: force
+      value: 'false'
+      disabled: true
+      description: 실행 이력이 있어도 강제 삭제(true면 qa_try까지 함께 삭제)
     settings:
       renderRequestBody: true
       encodeUrl: true
@@ -1843,6 +1855,115 @@ collection:
         - `200`: `"세션 종료 완료"`
         - `401`: 미인증
         - `404`: 비참여자/미존재
+    method: POST
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+- name: QA Run (실행)
+  meta:
+    id: fld_orch_qarun
+    created: 1786200000000
+    modified: 1786200000000
+  children:
+  - url: '{{ _.stage_orch_base_url }}/api/qa-runs'
+    name: POST /api/qa-runs — QA 런 실행 시작
+    meta:
+      id: req_orch_qarun_create
+      created: 1786200000000
+      modified: 1786200000000
+      isPrivate: false
+      description: |-
+        **호출 주체**: FE → Orchestration
+
+        **동작**: 테스트 런(TR) 하나를 QA 실행한다. 한 Agent 세션이 런의 시나리오들을 순차 실행하고 사이에 게임을 초기화한다. 부모 qa_run + 시나리오당 qa_try(PENDING)를 적재하고 첫 시나리오를 활성화한다. (ARTEL-259, PR #93)
+
+        **Request**
+        - `{ testRunId, gameInstanceId, model?, language?, promptVersion?, reasoning?, arch? }` (id는 문자열)
+
+        **Response**
+        - `201`: QaRunResponse (id, status, tries[])
+        - `401`: 미인증
+        - `404`: 런·인스턴스·시나리오 미존재/비참여
+        - `409`: 활성 런 존재 / SDK 미연결 / 실행할 시나리오 없음
+
+        **규칙**: 인스턴스당 활성 런 1개 → 시나리오 순차 실행 보장.
+    method: POST
+    body:
+      mimeType: application/json
+      text: '{"testRunId": "1", "gameInstanceId": "1", "model": "anthropic/claude-sonnet-5", "language": "ko", "promptVersion": "v8"}'
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/qa-runs/{% prompt ''QA Run ID'', ''myQaRunId'', ''QA Run ID'', '''', ''1'' %}'
+    name: GET /api/qa-runs/{id} — QA 런 조회
+    meta:
+      id: req_orch_qarun_get
+      created: 1786200000000
+      modified: 1786200000000
+      isPrivate: false
+      description: |-
+        **호출 주체**: FE 런 화면 → Orchestration (종단까지 폴링)
+
+        **동작**: 런 하나 + 시나리오별 qa_try 상태 개요. 시나리오별 실시간 상세는 qa_try SSE(`/api/qa-tries/{id}/events`). (ARTEL-259, PR #93)
+
+        **Request**
+        - `id` (path)
+
+        **Response**
+        - `200`: QaRunResponse (status, startedAt, completedAt, tries[])
+        - `401`: 미인증
+        - `404`: 비멤버/미존재
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/qa-runs/{% prompt ''QA Run ID'', ''myQaRunId'', ''QA Run ID'', '''', ''1'' %}/cancel'
+    name: POST /api/qa-runs/{id}/cancel — QA 런 실행 취소
+    meta:
+      id: req_orch_qarun_cancel
+      created: 1786200000000
+      modified: 1786200000000
+      isPrivate: false
+      description: |-
+        **호출 주체**: FE(런 종료) → Orchestration
+
+        **동작**: 런 전체 취소. 활성 시나리오는 Agent 세션 종료까지 취소하고, 미종단 try를 정리한 뒤 qa_run을 CANCELLED로 닫아 게임 인스턴스를 해제한다. 이 경로가 없으면 스테일 런이 인스턴스를 영구 점유해 재실행이 막힌다. (ARTEL-259 런 라이프사이클, PR #93)
+
+        **Request**
+        - `id` (path)
+
+        **Response**
+        - `204`: 취소 완료
+        - `401`: 미인증
+        - `404`: 비멤버/미존재
+        - `409`: 이미 종료된 런
     method: POST
     settings:
       renderRequestBody: true
