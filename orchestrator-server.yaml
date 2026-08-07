@@ -4,8 +4,20 @@ name: orchestrator-server
 meta:
   id: wrk_orch_artel_api_collection
   created: 1784859800000
-  modified: 1784859800000
-  description: 'Artel Orchestration Server API — 인증, 프로젝트, 기획서, 게임빌드·인스턴스, SDK·Agent·TestScenario. 환경: Base Environment는 stage(https://stage-api.artel.kr). stage_orch_base_url 변수 사용.'
+  modified: 1786060800000
+  description: |-
+    Artel Orchestration Server API — 인증, 프로젝트, 기획서, 게임빌드·인스턴스, SDK·Agent·TestScenario.
+
+    **두 개의 base URL을 쓴다**(ARTEL-265/266). 서버는 HTTP 체인을 둘 조립하고 포트로 가른다.
+
+    - `stage_orch_base_url` — 공개 포트(8080). `/api/**`·`/oauth2/**`·`/ws/**`가 여기 산다. 리버스 프록시가 넘기는 유일한 포트다. 이 포트로 `/internal/...`을 부르면 **404**다 — 401이 아니라 404인 것은 "인증만 하면 있다"는 사실조차 흘리지 않기 위해서다.
+    - `stage_orch_internal_base_url` — 내부 포트(기본 8081). 무인증 서버-투-서버 API(`/internal/**`) 전용이며, 이 포트로는 `/internal` **밖**이 전부 404다. 컨테이너에서 호스트로 게시하지 않으므로 인터넷에서는 존재하지 않는다.
+
+    경로만 고치고 base URL을 그대로 두면 여전히 404이고, 원인이 경로인지 포트인지 응답만 봐서는 구분되지 않는다. `/internal/*` 요청이 404면 먼저 어느 변수를 쓰고 있는지 본다.
+
+    배포된 내부 포트에 붙어야 하면 SSH 터널을 판다(`ssh -L 8081:localhost:8081 <host>`). 그러면 기본값 `http://localhost:8081` 그대로 맞는다.
+
+    비밀값(JWT 등)은 이 파일에 넣지 말고 Insomnia private environment로 관리한다.
 collection:
 - name: Auth
   meta:
@@ -754,7 +766,7 @@ collection:
     authentication:
       type: bearer
       token: '{{ _.stage_orch_jwt }}'
-- name: SDK · 내부(permitAll)
+- name: SDK
   meta:
     id: fld_orch_sdk_internal
     created: 1784859805000
@@ -799,34 +811,29 @@ collection:
         send: true
         store: true
       rebuildPath: true
-  - url: '{{ _.stage_orch_base_url }}/api/orchestration/action/{% prompt ''Instance ID'', ''myInstanceId'', ''Instance ID'', '''', ''myInstanceId'' %}'
-    name: POST /api/orchestration/action/{instanceId} — 게임 인스턴스 액션 전달
+  - url: '{{ _.stage_orch_internal_base_url }}/internal/action/{% prompt ''Instance ID'', ''myInstanceId'', ''Instance ID'', '''', ''myInstanceId'' %}'
+    name: POST /internal/action/{instanceId} — 게임 인스턴스 액션 전달 (내부 포트)
     meta:
       id: req_orch_action
       created: 1784859821000
       modified: 1784859821000
       isPrivate: false
-      description: '**호출 주체**: 내부(Agent/서버) → Orchestration (permitAll)
-
+      description: |-
+        **호출 주체**: Agent 서버 → Orchestration (서버-투-서버, 무인증)
 
         **동작**: 대상 인스턴스로 액션을 전달한다. Orchestration은 SessionManager에서 인스턴스의 WS 세션을 찾아 SDK로 push한다.
 
+        **⚠️ 내부 포트로 간다**(`stage_orch_internal_base_url`, 기본 8081). 공개 포트로 이 경로를 부르면 404다. 인스턴스 **등록**은 여기가 아니라 공개 포트의 `POST /api/sdk/registrations`에서 한다 — 그쪽은 SDK 토큰으로 통과하는 사용자 경로이고, 이쪽은 토큰이 아예 없는 서버-투-서버 경로다.
 
         **Request**
-
         - `instanceId` (path)
-
         - `{ action payload }`
 
-
         **Response**
-
         - `200`: 전달 완료
-
         - 대상 세션 없음 시 오류
 
-
-        **참고**: 내부 통신 경로(permitAll).'
+        **활용**: 404가 나면 먼저 base URL 변수를 본다. 경로(`/internal/action`)와 포트(8081)가 ARTEL-265/266에서 함께 바뀌었고, 둘 중 하나만 맞으면 응답은 똑같이 404다.
     method: POST
     body:
       mimeType: application/json
@@ -1365,15 +1372,17 @@ collection:
     authentication:
       type: bearer
       token: '{{ _.stage_orch_jwt }}'
-  - url: '{{ _.stage_orch_base_url }}/api/test-case-spec/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''1'' %}'
-    name: POST /api/test-case-spec/{projectId} — Agent 명세 CSV 수신
+  - url: '{{ _.stage_orch_internal_base_url }}/internal/test-case-spec/{% prompt ''Project ID'', ''myProjectId'', ''Project ID'', '''', ''1'' %}'
+    name: POST /internal/test-case-spec/{projectId} — Agent 명세 CSV 수신 (내부 포트)
     meta:
       id: req_orch_testcase_spec_ingest
       created: 1785400000000
       modified: 1785400000000
       isPrivate: false
       description: |-
-        **호출 주체**: Agent 서버 → Orchestration (서버-투-서버, **permitAll — 토큰 없음**)
+        **호출 주체**: Agent 서버 → Orchestration (서버-투-서버, 무인증 — 토큰 없음)
+
+        **⚠️ 내부 포트로 간다**(`stage_orch_internal_base_url`, 기본 8081). 바로 아래 `GET /api/projects/{projectId}/test-case-spec/download`와 이름이 겹치지만 **다른 포트, 다른 신뢰 경계**다 — 그쪽은 공개 포트의 인증된 사용자 경로이고 이쪽은 무인증 서버-투-서버 경로다. 이 요청이 404면 base URL 변수부터 본다.
 
         **동작**: 사용자가 SDK를 등록하는 시점에 Agent가 만든 기능 테스트 명세 CSV를 받아 두 가지를 한 흐름에서 처리한다. ①행을 `test_case`로 적재하고 ②같은 표를 XLSX로 변환해 S3에 저장한다(사용자가 대시보드에서 내려받는 산출물).
 
@@ -1861,36 +1870,32 @@ collection:
     created: 1784859807000
     modified: 1784859807000
   children:
-  - url: '{{ _.stage_orch_base_url }}/api/knowledge'
-    name: GET /api/knowledge — 게임 지식(knowledge) 조회
+  - url: '{{ _.stage_orch_internal_base_url }}/internal/knowledge'
+    name: GET /internal/knowledge — 게임 지식(knowledge) 조회 (내부 포트)
     meta:
       id: req_orch_knowledge_query
       created: 1784859901000
       modified: 1784859901000
       isPrivate: false
-      description: '**호출 주체**: Agent/내부 도구 → Orchestration (내부, permitAll)
+      description: |-
+        **호출 주체**: Agent/내부 도구 → Orchestration (서버-투-서버, 무인증)
 
+        **⚠️ 내부 포트로 간다**(`stage_orch_internal_base_url`, 기본 8081). 공개 포트로 부르면 404다.
 
         **동작**: reference_context를 대체한 통합 지식창고 `knowledge`를 조회한다. 프로젝트 스코프에서 `source`/`tag`로 필터한다. 시나리오 작성·QA·보고서·Issue 작성 Agent가 소비한다.
 
+        **운영 지식창고만 보여 준다**(ARTEL-256). 실험 스코프(arm)는 이 엔드포인트로 보이지 않는다.
 
         **Request**
-
         - `projectId` (query, 필수)
-
         - `source` (query, 선택): DOCS | QA (대소문자 무시)
-
         - `tag` (query, 선택): CONTROL | RULE | OBJECTIVE | UI | MISC (대소문자 무시)
 
-
         **Response**
-
         - `200`: `{ items: [ { id, projectId, source, sourceId, contentHash, tag, summary, description, createdAt } ] }` (id 계열은 문자열)
-
         - `400`: 제공했으나 잘못된 `source`/`tag` 값
 
-
-        **활용**: Agent가 필요한 성질(tag)·출처(source)만 뽑아 참고한다. 적재는 DOCS=업로드→/extract, QA=QA 세션 WS(type=KNOWLEDGE). Phase 2에서 하이브리드 검색(벡터+FTS)으로 확장 예정.'
+        **활용**: Agent가 필요한 성질(tag)·출처(source)만 뽑아 참고한다. 적재는 DOCS=업로드→Agent `/internal/extract`, QA=QA 세션 WS(`KNOWLEDGE_CREATE`).
     method: GET
     parameters:
     - name: projectId
@@ -1907,6 +1912,86 @@ collection:
         send: true
         store: true
       rebuildPath: true
+- name: LLM Usage
+  meta:
+    id: fld_orch_llm_usage
+    created: 1786060800000
+    modified: 1786060800000
+  children:
+  - url: '{{ _.stage_orch_internal_base_url }}/internal/llm-usage'
+    name: POST /internal/llm-usage — LLM 사용량 수집 (내부 포트)
+    meta:
+      id: req_orch_llm_usage_record
+      created: 1786060800000
+      modified: 1786060800000
+      isPrivate: false
+      description: |-
+        **호출 주체**: Agent 서버 → Orchestration (서버-투-서버, 무인증). ARTEL-233/234, 경로 변경은 ARTEL-267.
+
+        **⚠️ 내부 포트로 간다**(`stage_orch_internal_base_url`, 기본 8081). 공개 포트로 부르면 404다.
+
+        **동작**: Agent가 모은 LLM 호출 사용량 배치를 적재한다. 응답 본문이 없다 — 보내는 쪽은 결과를 보지 않고 재시도도 하지 않으므로 204면 충분하다.
+
+        **Request**
+        - `records` (object[], 필수, 1–200건): 상한 200은 Agent 쪽 전송 배치 크기와 맞춘 계약값이다. 넘치면 Agent가 나눠 보낸다. **빈 배열은 400** — 호출이 없었다면 요청 자체가 없어야 한다
+        - `records[].service` (enum, 필수): `QA_RUN` | `SCENARIO` | `KNOWLEDGE_QUERY` | `GAME_CONTEXT` | `EMBEDDING`
+        - `records[].referenceId` (number, 선택): `service`가 가리키는 테이블의 id. FK가 아니고 null이어도 저장된다 — Agent가 어떤 프로젝트/실행의 호출인지 모르는 경로가 있고, 그 경우 지출만 남는다
+        - `records[].provider` (string, 필수, ≤40) / `model` (string, 필수, ≤80)
+        - `records[].inputTokens`, `outputTokens`, `cachedInputTokens`, `reasoningTokens`, `latencyMs` (number, 0 이상). `EMBEDDING`의 `outputTokens`는 항상 0이다(임베딩은 토큰을 생성하지 않는다)
+        - `records[].costUsd` (number, 선택): provider가 단가를 알려주지 않으면 없다
+        - `records[].calledAt` (string, 필수): Agent가 provider를 실제로 호출한 시각(ISO-8601 UTC). 집계 기준 시각이다
+
+        **Response**
+        - `204`: 본문 없음
+        - `400`: 배치 크기 위반 또는 필드 검증 실패(`service` 오타 포함 — DB CHECK까지 가지 않고 파싱 단계에서 떨어진다)
+
+        **활용**: 손으로 시험할 때 `calledAt`을 과거로 두면 그 시각 버킷에 집계된다. 재전송은 중복 적재이므로 같은 배치를 두 번 보내지 않는다.
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "records": [
+            {
+              "service": "QA_RUN",
+              "referenceId": 1,
+              "provider": "openrouter",
+              "model": "openai/gpt-4o-mini",
+              "inputTokens": 1820,
+              "outputTokens": 240,
+              "cachedInputTokens": 0,
+              "reasoningTokens": 0,
+              "costUsd": 0.00042,
+              "latencyMs": 1350,
+              "calledAt": "2026-08-07T00:00:00Z"
+            },
+            {
+              "service": "EMBEDDING",
+              "referenceId": null,
+              "provider": "openrouter",
+              "model": "openai/text-embedding-3-small",
+              "inputTokens": 512,
+              "outputTokens": 0,
+              "cachedInputTokens": 0,
+              "reasoningTokens": 0,
+              "latencyMs": 210,
+              "calledAt": "2026-08-07T00:00:05Z"
+            }
+          ]
+        }
+    headers:
+    - name: Content-Type
+      value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: none
 cookieJar:
   name: Default Jar
   meta:
@@ -1921,7 +2006,14 @@ environments:
     modified: 1784859800000
     isPrivate: false
   data:
+    # 공개 포트(8080). `/api/**`·`/oauth2/**`·`/ws/**`가 여기 산다.
     stage_orch_base_url: https://stage-api.artel.kr
+    # 무인증 서버-투-서버 API(`/internal/**`) 전용 포트(ARTEL-266, 기본 8081).
+    # 컨테이너가 호스트로 게시하지 않으므로 인터넷에서는 존재하지 않는다 — 그래서
+    # stage 호스트명이 아니라 localhost다. 배포된 내부 포트를 두드려야 하면 터널을 판다:
+    #   ssh -L 8081:localhost:8081 <host>
+    # 끝에 슬래시를 두지 않는다.
+    stage_orch_internal_base_url: http://localhost:8081
     stage_orch_jwt: '{{ stage_orch_jwt }}'
   subEnvironments:
   - name: local
@@ -1933,4 +2025,5 @@ environments:
       sortKey: 0
     data:
       stage_orch_base_url: http://localhost:8080
+      stage_orch_internal_base_url: http://localhost:8081
       stage_orch_jwt: '{{ stage_orch_jwt }}'
