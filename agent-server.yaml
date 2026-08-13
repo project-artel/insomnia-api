@@ -4,15 +4,22 @@ name: agent-server
 meta:
   id: wrk_3b5acfc130bd41b088450cbe1090a668
   created: 1784719753827
-  modified: 1784719865193
+  modified: 1786060800000
   description: >-
-    Artel Agent Server API — 시나리오 생성/QA 세션 및 기획서 game_context 추출
-    엔드포인트.
+    Artel Agent Server API — 시나리오 생성/QA 세션, 기획서 game_context 추출,
+    임베딩·knowledge 질의·모델 카탈로그 엔드포인트.
+
+    경로 체계(ARTEL-270): 업무 엔드포인트는 전부 `/internal` 아래에 있다. 그
+    접두사가 신뢰 경계다 — 아래는 Orchestration에서 오는 무인증 서버-투-서버
+    트래픽이고, 밖은 아니다. `/health`만 접두사 없이 남는다(컨테이너·툴링
+    표면이지 제품 API가 아니다).
 
     환경: Base Environment는 stage(https://stage-agent.artel.kr), local
     서브 환경은 http://localhost:8000. stage_agent_base_url /
-    stage_agent_ws_url 두 변수를 사용한다. 비밀값은 이 파일에 넣지 말고
-    Insomnia private environment로 관리한다.
+    stage_agent_ws_url 두 변수를 사용하며, 둘 다 끝에 슬래시를 두지 않는다 —
+    `…/`에 `/internal/embed`가 붙으면 `//internal/embed`가 되고 FastAPI는
+    리다이렉트 없이 404를 낸다. 비밀값은 이 파일에 넣지 말고 Insomnia
+    private environment로 관리한다.
 
     /extract의 `extract_source_url` 기본값은 공개해 둔 테스트 픽스처 하나를 가리키므로
     pull 직후 바로 실행된다. 다른 문서로 시험하려면 presigned URL을 private
@@ -44,8 +51,8 @@ collection:
         send: true
         store: true
       rebuildPath: true
-  - url: "{{ _.stage_agent_base_url }}/sessions"
-    name: /sessions — 세션 열기
+  - url: "{{ _.stage_agent_base_url }}/internal/sessions"
+    name: /internal/sessions — 세션 열기
     meta:
       id: req_7d5ab9224f184b338e9e2e7a12df2f3c
       created: 1784681461524
@@ -59,7 +66,7 @@ collection:
         **Request**
         - `user_input` (string, 필수): 만들고 싶은 시나리오에 대한 자연어 지시
         - `unity_context` (object, 선택): Unity 런타임에서 수집한 현재 게임 상태. 기본 `{}`
-        - `game_context` (object, 선택): 기획서에서 추출한 게임 지식. `POST /extract` 응답의 `game_context`를 그대로 넣는다. 기본 `{}`
+        - `game_context` (object, 선택): 기획서에서 추출한 게임 지식. `POST /internal/extract` 응답의 `game_context`를 그대로 넣는다. 기본 `{}`
         - `model` (enum, 선택): 기본 `openai/gpt-4o-mini`. `openai/gpt-4o`, `anthropic/claude-sonnet-5`, `anthropic/claude-opus-4.8`, `google/gemini-2.5-flash`, `google/gemini-2.5-pro`, `google/gemma-4-31b-it:free`
         - `language` (enum, 선택): 시나리오 출력 언어. 기본 `ko`. `ko`(한국어) | `en`(영어). 첫 턴을 포함한 세션 전체에 적용된다
 
@@ -67,7 +74,7 @@ collection:
         - `200`: `{ session_id }`
         - `422`: body 검증 실패
 
-        **활용**: 반환된 `session_id`로 WS `/sessions/{session_id}`에 연결해야 실제 시나리오가 생성된다. 이 컬렉션의 다른 요청들은 응답 체이닝으로 이 값을 자동 참조하므로, 이 요청을 먼저 한 번 실행해 두면 된다.
+        **활용**: 반환된 `session_id`로 WS `/internal/sessions/{session_id}`에 연결해야 실제 시나리오가 생성된다. 이 컬렉션의 다른 요청들은 응답 체이닝으로 이 값을 자동 참조하므로, 이 요청을 먼저 한 번 실행해 두면 된다.
       sortKey: -1784682511794
     method: POST
     body:
@@ -92,10 +99,10 @@ collection:
         send: true
         store: true
       rebuildPath: true
-  - url: "{{ _.stage_agent_base_url }}/sessions/{% response 'body',
+  - url: "{{ _.stage_agent_base_url }}/internal/sessions/{% response 'body',
       'req_7d5ab9224f184b338e9e2e7a12df2f3c', 'b64::JC5zZXNzaW9uX2lk::46b',
       'never', 60 %}/approve"
-    name: /sessions/{session_id}/approve — 승인·종료
+    name: /internal/sessions/{session_id}/approve — 승인·종료
     meta:
       id: req_61b7e8a85810422eb2d2c19b3890eff5
       created: 1784681463447
@@ -107,7 +114,7 @@ collection:
         **동작**: 세션을 Redis에서 지우고 종료한다. **서버 동작은 `/decline`과 완전히 동일하다** — Agent Server는 자기가 소유한 세션만 정리하고, 승인/거절의 의미(시나리오 저장 여부)는 Orchestration이 판단한다. 그래서 이 엔드포인트는 draft 내용을 받지도, 저장하지도 않는다. 채택할 시나리오는 WS의 마지막 `result` 이벤트에서 Orchestration이 이미 갖고 있다.
 
         **Request**
-        - 경로의 `session_id`만. body 없음. (이 요청은 `POST /sessions` 응답에서 자동으로 채워진다)
+        - 경로의 `session_id`만. body 없음. (이 요청은 `POST /internal/sessions` 응답에서 자동으로 채워진다)
 
         **Response**
         - `200`: `{ "ok": true }`
@@ -123,10 +130,10 @@ collection:
         send: true
         store: true
       rebuildPath: true
-  - url: "{{ _.stage_agent_base_url }}/sessions/{% response 'body',
+  - url: "{{ _.stage_agent_base_url }}/internal/sessions/{% response 'body',
       'req_7d5ab9224f184b338e9e2e7a12df2f3c', 'b64::JC5zZXNzaW9uX2lk::46b',
       'never', 60 %}/decline"
-    name: /sessions/{session_id}/decline — 거절·종료
+    name: /internal/sessions/{session_id}/decline — 거절·종료
     meta:
       id: req_1350e17a0fcc4705b0c65002832f977b
       created: 1784681464984
@@ -138,12 +145,12 @@ collection:
         **동작**: 세션을 Redis에서 지우고 종료한다. **서버 동작은 `/approve`와 완전히 동일하다** — 두 엔드포인트가 나뉜 것은 Orchestration 쪽 의도를 호출부에 남기기 위해서이고, Agent Server는 어느 쪽이든 세션 정리만 한다.
 
         **Request**
-        - 경로의 `session_id`만. body 없음. (이 요청은 `POST /sessions` 응답에서 자동으로 채워진다)
+        - 경로의 `session_id`만. body 없음. (이 요청은 `POST /internal/sessions` 응답에서 자동으로 채워진다)
 
         **Response**
         - `200`: `{ "ok": true }`
 
-        **활용**: 호출 후 해당 `session_id`는 무효가 된다. 다시 만들려면 `POST /sessions`부터 시작한다.
+        **활용**: 호출 후 해당 `session_id`는 무효가 된다. 다시 만들려면 `POST /internal/sessions`부터 시작한다.
       sortKey: -1784682511797
     method: POST
     settings:
@@ -154,8 +161,8 @@ collection:
         send: true
         store: true
       rebuildPath: true
-  - url: "{{ _.stage_agent_base_url }}/extract"
-    name: /extract — 기획서에서 game_context 추출
+  - url: "{{ _.stage_agent_base_url }}/internal/extract"
+    name: /internal/extract — 기획서에서 game_context 추출
     meta:
       id: req_c7f077298de149d28c266bdd0a9b4357
       created: 1784719778638
@@ -196,7 +203,7 @@ collection:
         - `422`: 추출 결과가 스키마 검증 실패
         - `502`: 문서 fetch 실패(서명 없음·만료·크기 초과·타임아웃) 또는 LLM 오류
 
-        **활용**: 반환된 `game_context`를 Orchestration이 `knowledge`(source=DOCS)에 적재한다. 조회는 Orchestration `GET /api/knowledge`. 원본 PDF는 S3에 남고 presigned URL은 저장하지 않는다.
+        **활용**: 반환된 `game_context`를 Orchestration이 `knowledge`(source=DOCS)에 적재한다. 조회는 Orchestration `GET /internal/knowledge`(내부 포트, 기본 8081). 원본 PDF는 S3에 남고 presigned URL은 저장하지 않는다.
       sortKey: -1784697066598.5
     method: POST
     body:
@@ -218,10 +225,10 @@ collection:
         send: true
         store: true
       rebuildPath: true
-  - url: "{{ _.stage_agent_ws_url }}/sessions/{% response 'body',
+  - url: "{{ _.stage_agent_ws_url }}/internal/sessions/{% response 'body',
       'req_7d5ab9224f184b338e9e2e7a12df2f3c', 'b64::JC5zZXNzaW9uX2lk::46b',
       'never', 60 %}"
-    name: /sessions/{session_id} — 시나리오 스트림
+    name: /internal/sessions/{session_id} — 시나리오 스트림
     meta:
       id: ws-req_ddf5b310e09648fb92147dcde3e73631
       created: 1784682778201
@@ -232,7 +239,7 @@ collection:
         **동작**: 연결되면 서버가 먼저 세션에 저장된 최초 `user_input`으로 시나리오를 생성해 `result`를 밀어준다. 이후로는 클라이언트가 `turn`을 보낼 때마다 직전 draft를 고쳐 새 `result`를 돌려주는 왕복이다. 히스토리는 최근 10턴까지만 유지된다.
 
         **흐름**
-        1. `POST /sessions`로 `session_id` 획득
+        1. `POST /internal/sessions`로 `session_id` 획득
         2. 이 URL로 WS 연결 → 서버가 첫 `result` 전송 (요청 없이 먼저 온다)
         3. `turn` 전송 → `result` 수신, 만족할 때까지 반복
         4. `close` 전송 또는 HTTP `/approve`·`/decline`으로 종료
@@ -268,13 +275,252 @@ collection:
         - `error`: `{ "type":"error", "code":"...", "detail":"..." }`
 
         **error code**
-        - `session_expired`: 세션 없음/만료. **소켓이 닫힌다** — `POST /sessions`부터 다시
+        - `session_expired`: 세션 없음/만료. **소켓이 닫힌다** — `POST /internal/sessions`부터 다시
         - `bad_request`: `turn` 메시지 스키마 위반. 연결 유지, 재전송 가능
         - `validation_error`: LLM 결과가 시나리오 스키마 검증 실패. 연결 유지
         - `llm_error`: OpenRouter 오류. 연결 유지
 
         **활용**: 마지막으로 받은 `result`의 `scenario`가 채택 대상이다. Agent Server는 이를 저장하지 않으므로 Orchestration이 들고 있다가 `/approve` 시점에 자기 DB에 기록한다.
       sortKey: -1784682778201
+    settings:
+      encodeUrl: true
+      cookies:
+        store: true
+        send: true
+      followRedirects: global
+  - url: "{{ _.stage_agent_base_url }}/internal/qa-sessions"
+    name: /internal/qa-sessions — QA 실행 세션 열기
+    meta:
+      id: req_2a1f4c9b7d3e48c1a6b05e7f9c2d3a41
+      created: 1786060800000
+      modified: 1786060800000
+      isPrivate: false
+      description: |-
+        **호출 주체**: Orchestration → Agent Server. 승인된 test scenario로 QA 런을 시작할 때.
+
+        **동작**: QA 실행 세션을 Redis(`qa:` 네임스페이스)에 만들고 `session_id`와 **확정된 실행 설정**(`run_config`)을 돌려준다. 이 요청 자체는 게임을 건드리지 않는다 — 실제 실행은 WS 연결 이후다.
+
+        `run_config`가 요청과 따로 존재하는 이유는 요청의 몇몇 필드가 사실이 아니라 소원이기 때문이다. `prompt_version: null`은 "가장 새 버전"이라는 별칭이라 `v4` 디렉터리가 생기는 날 의미가 바뀌고, `reasoning: null`은 "요청하지 않음"과 "이 모델엔 없음"을 구분하지 못하며, `arch.vision: "auto"`는 답이 아니라 질문이다. 그래서 세션을 여는 이 시점에 한 번 전부 해소해 그 형태를 저장·기록·반환한다. 런 비교(ARTEL-239)가 딛는 유일한 기록이다.
+
+        **Request**
+        - `context` (object, 필수): `qa_try_id`, `game_instance_id`, `test_scenario_id` (모두 number), `scenario` (승인된 `{ title, description, steps[] }`. `steps[].step`은 1부터 연속)
+        - `model` (enum, 선택): 기본 `openai/gpt-4o-mini`
+        - `language` (enum, 선택): 기본 `ko`. `ko` | `en`
+        - `prompt_version` (string, 선택): `app/prompts/qa_run/` 아래 버전 디렉터리명. 생략하면 배포의 `QA_PROMPT_VERSION`, 그것도 없으면 최신
+        - `reasoning` (object, 선택): 모델이 지원하지 않는 값이면 422. 다운그레이드하지 않는다
+        - `arch` (object, 선택): 에이전트 **구조**. 루프 상한·런당 허용량·vision·미들웨어. 생략하면 오늘의 구조. 구조 실험을 두 번 배포하지 않고 비교하기 위한 축이다. 주요 필드: `label`, `base_tool_calls`(1–100), `tool_calls_per_step`(1–100), `deadline_seconds`(0–3600), `max_searches_per_run`·`max_records_per_run`·`max_forgets_per_run`·`max_captures_per_run`·`max_issues_per_run`, `vision`(`auto`|…), `fold_stale_scenes`, `fold_stale_knowledge`, `compaction*`. `extra="forbid"`라 오타 필드는 422
+
+        **Response**
+        - `200`: `{ session_id, run_config }`. `run_config`에는 `model`, `provider`, `temperature`, `reasoning`, `reasoning_supported`, `language`, `prompt_version`(별칭이 아닌 실제 버전), `prompt_hashes`, `agent_arch`, `agent_fingerprint`, `arch`, `tools`가 들어 있다
+        - `422`: body 검증 실패, 또는 모델이 지원하지 않는 `reasoning`/`arch`
+
+        **활용**: `run_config`를 Orchestration이 try에 저장한다 — 요청이 사라지면 그 런이 무엇으로 실행됐는지 아는 기록은 이것뿐이다. `session_id`로 아래 WS에 연결해야 런이 실제로 돈다.
+      sortKey: -1784682511792
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "context": {
+            "qa_try_id": 1,
+            "game_instance_id": 1,
+            "test_scenario_id": 1,
+            "scenario": {
+              "title": "로그인 실패 시나리오",
+              "description": "잘못된 비밀번호 입력 흐름",
+              "steps": [
+                {"step": 1, "title": "로그인 화면 진입", "state": "앱 실행됨", "action": "로그인 버튼 탭", "expected": "로그인 폼 표시"},
+                {"step": 2, "title": "잘못된 비밀번호 입력", "state": "로그인 폼 표시됨", "action": "비밀번호에 임의 문자열을 넣고 확인", "expected": "인증 실패 안내 노출"}
+              ]
+            }
+          },
+          "model": "openai/gpt-4o-mini",
+          "language": "ko"
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.stage_agent_base_url }}/internal/embed"
+    name: /internal/embed — 텍스트 배치 임베딩
+    meta:
+      id: req_8e4d2b7a1c6f49d0b3a75e28c1f0d6b3
+      created: 1786060800000
+      modified: 1786060800000
+      isPrivate: false
+      description: |-
+        **호출 주체**: Orchestration의 knowledge 백필 워커 → Agent Server.
+
+        **동작**: 텍스트 배치를 OpenRouter 임베딩 모델에 한 번에 넘겨 벡터를 돌려준다. 호출자가 항상 여러 행을 손에 쥔 백필 워커라 단건이 아니라 리스트를 받는다 — 배치 하나가 왕복 하나다.
+
+        **Request**
+        - `texts` (string[], 필수, 최소 1개): 임베딩할 텍스트
+        - `project_id` (number, 선택): 이 호출의 LLM 지출을 귀속시킬 프로젝트. 아직 보내지 않는 Orchestration도 동작하도록 선택이며, 없으면 참조 없이 지출만 남는다
+
+        **Response**
+        - `200`: `{ model, dimensions, vectors }`. `model` 슬러그가 벡터와 함께 오므로 저장하는 쪽이 어느 모델에서 나온 행인지 알고 재색인 시점을 판단할 수 있다
+        - `422`: 빈 배치 또는 배치 크기 초과
+        - `502`: 임베딩 provider 오류
+
+        **활용**: 응답 본문이 커질 수 있다 — Orchestration의 WebClient 버퍼를 넘겨 백필이 전량 실패한 적이 있다(ARTEL-278). 큰 배치로 시험할 때 이 점을 같이 본다.
+      sortKey: -1784682511790
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "texts": [
+            "구매는 소지금이 가격 이상일 때 가능하다",
+            "상점은 마을에서만 열린다"
+          ],
+          "project_id": 1
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.stage_agent_base_url }}/internal/knowledge-queries"
+    name: /internal/knowledge-queries — knowledge 검색 질의 생성
+    meta:
+      id: req_3f7a9c2e5b8d41f6a0c94e7b2d1a5c88
+      created: 1786060800000
+      modified: 1786060800000
+      isPrivate: false
+      description: |-
+        **호출 주체**: Orchestration의 knowledge 백필 워커 → Agent Server.
+
+        **동작**: knowledge 항목마다 "이 항목을 찾아낼 법한 질문" 3개를 생성한다. 검색 키가 항목 자신의 문장이 아닌 이유가 여기 있다 — QA 엔지니어는 질문("골드 모자라면 어떻게 되나")을 치고 항목은 진술("구매는 소지금이 가격 이상일 때 가능하다")이라, 둘은 임베딩 공간에서 떨어져 있다. 질문을 만들어 그쪽을 임베딩하면 양쪽이 같은 모양이 된다.
+
+        항목마다 3개인 것은 항목 본문 자체의 벡터를 만들지 않기 때문이다 — 생성된 질문 뒤에 대비책이 없어서, 하나가 빗나가면 그 항목이 검색되지 않는다.
+
+        **Request**
+        - `items` (object[], 필수, 최소 1개): `{ id, summary, description }`. `id`는 그대로 돌려받는 불투명 값이라 순서에 기대지 않고 배치 응답을 맞출 수 있다
+        - `model` (enum, 선택): 기본 `openai/gpt-4o-mini`
+        - `project_id` (number, 선택): LLM 지출 귀속 대상
+
+        **Response**
+        - `200`: `{ results: [ { id, queries } ] }`
+        - `422`: 배치가 배포의 항목 수 상한을 넘음(메시지에 상한이 적혀 온다)
+
+        **활용**: 생성된 `queries`를 `/internal/embed`로 임베딩해 검색 인덱스에 넣는다.
+      sortKey: -1784682511789
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "items": [
+            {
+              "id": "42",
+              "summary": "구매는 소지금이 가격 이상일 때 가능하다",
+              "description": "골드가 부족하면 구매 버튼이 비활성화되고 안내 문구가 뜬다."
+            }
+          ],
+          "model": "openai/gpt-4o-mini",
+          "project_id": 1
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.stage_agent_base_url }}/internal/models"
+    name: /internal/models — 모델 카탈로그
+    meta:
+      id: req_6b1d5e3a8c2f47b9a5e08d1c3f6a2b74
+      created: 1786060800000
+      modified: 1786060800000
+      isPrivate: false
+      description: |-
+        **호출 주체**: Orchestration → Agent Server. FE의 모델 선택 UI가 무엇을 고를 수 있는지 알아야 할 때.
+
+        **동작**: Agent Server가 실제로 받아들이는 모델 목록과 각 모델의 능력을 돌려준다. 목록을 FE에 하드코딩하지 않게 하는 것이 목적이다 — 모델을 추가·제거하는 쪽과 고르게 하는 쪽이 갈리면, 없는 모델을 고를 수 있는 UI가 생긴다.
+
+        **Request**
+        - 없음
+
+        **Response**
+        - `200`: `[ { id, label, provider, supports_strict_json, supports_vision, input_modalities, multimodal, reasoning } ]`
+          - `reasoning`: `null`이거나 `{ kind, efforts, min_tokens, max_tokens, step }`. 이 모델에 `reasoning`을 어떻게 줄 수 있는지를 말한다
+
+        **활용**: `/internal/sessions`·`/internal/qa-sessions`의 `model`·`reasoning`에 넣을 값이 여기서 나온다. Orchestration은 이 응답을 TTL(기본 5분) 동안 캐시한다.
+      sortKey: -1784682511788
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.stage_agent_ws_url }}/internal/qa-sessions/{% response 'body',
+      'req_2a1f4c9b7d3e48c1a6b05e7f9c2d3a41', 'b64::JC5zZXNzaW9uX2lk::46b',
+      'never', 60 %}"
+    name: /internal/qa-sessions/{session_id} — QA 실행 스트림
+    meta:
+      id: ws-req_5c3e8b1a9f2d4e7ab8c60d5f1e934b27
+      created: 1786060800000
+      modified: 1786060800000
+      description: |-
+        **호출 주체**: Orchestration → Agent Server (WebSocket). QA 런이 실제로 도는 구간 전체.
+
+        **동작**: 연결되면 런이 스스로 돌기 시작하고, 이 소켓은 런에 들어오는 것을 먹여 주는 통로다. 시나리오 채팅 WS와 달리 프레임이 **공통 envelope 하나**로 감싸여 있고 `type`이 payload를 고른다. SDK JSON-RPC 번역·`qa_log`·SSE는 Orchestration 소유이며 이 소켓에는 없다.
+
+        **흐름**
+        1. `POST /internal/qa-sessions`로 `session_id` 획득
+        2. 이 URL로 WS 연결 → 런 시작
+        3. Orchestration이 `GAME_STATE`·`ACTION_RESULT`를, Agent가 `ACTION`·`LOG`·`STATUS`를 주고받는다
+        4. 런이 끝나면 서버가 소켓을 닫는다
+
+        **Envelope**
+        ```json
+        {
+          "messageId": "0d2f2c1e-8b7a-4c33-9f0c-2b1f4d5e6a7b",
+          "type": "GAME_STATE",
+          "qaTryId": "1",
+          "correlationId": null,
+          "sequence": 0,
+          "timestamp": "2026-08-07T00:00:00+00:00",
+          "payload": {}
+        }
+        ```
+        `messageId`는 하이픈 있는 정규 UUID여야 한다 — Orchestration이 `UUID.fromString`으로 검증하며 32자 무하이픈 형태를 거절한다. `qaTryId`는 JSON 숫자가 아니라 **십진 문자열**이다.
+
+        **Orchestration → Agent**: `GAME_STATE`, `ACTION_RESULT`, `CANCEL`, `KNOWLEDGE_SEARCH_RESULT`, `KNOWLEDGE_EXPAND_RESULT`
+
+        **Agent → Orchestration**: `LOG`, `ACTION`, `STATUS`, `KNOWLEDGE_SEARCH`, `KNOWLEDGE_EXPAND`, `KNOWLEDGE_CREATE`, `KNOWLEDGE_UPDATE`, `KNOWLEDGE_DELETE`, `KNOWLEDGE_LINK`, `KNOWLEDGE_UNLINK`, `ISSUE`
+
+        **양방향**: `ERROR`, `CHAT`
+
+        **⚠️ 응답이 오는 것과 오지 않는 것**: `KNOWLEDGE_SEARCH`·`KNOWLEDGE_EXPAND`만 `*_RESULT`로 답이 온다(같은 `messageId`로 상관). knowledge 쓰기 3종·링크 2종·`ISSUE`는 **단방향**이다 — 성공은 조용하고, 거절은 이 소켓이 아니라 운영자 타임라인에 `ORCHE_INTERNAL` 행으로 남는다. 이쪽에서 답을 기다리면 안 된다.
+
+        **error code**
+        - `session_expired`: 세션 없음/만료. 첫 프레임으로 오고 소켓이 닫힌다
+        - `bad_request`: 지원하지 않는 inbound 프레임. 연결 유지
+
+        **활용**: 손으로 시험할 때는 `POST /internal/qa-sessions`를 먼저 실행해 두면 이 URL의 `session_id`가 응답 체이닝으로 채워진다. 실제 런은 Orchestration이 게임 상태를 계속 먹여 주어야 진행되므로, 이 요청 하나만으로는 연결과 첫 프레임까지만 확인된다.
+      sortKey: -1784682511791
     settings:
       encodeUrl: true
       cookies:
