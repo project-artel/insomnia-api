@@ -32,7 +32,8 @@ is installed.
 7. Follow `testing.md`; use an installed testing skill when available.
 8. Review the complete diff for scope, correctness, and accidental churn.
 9. Commit coherent units using the commit convention.
-10. Open a PR with evidence and explicit remaining risk.
+10. Open a draft PR with evidence and explicit remaining risk. Follow
+    `pull-request.md` for draft ownership and user-notification rules.
 11. Address review without hiding unresolved concerns.
 
 ## Change Rules
