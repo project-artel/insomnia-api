@@ -612,6 +612,119 @@ collection:
     authentication:
       type: bearer
       token: '{{ _.stage_orch_jwt }}'
+- name: Content Map (씬 명세)
+  meta:
+    id: fld_orch_contentmap
+    created: 1787000000000
+    modified: 1787000000000
+  children:
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'',
+      ''Project ID'', '''', ''myProjectId'' %}/game-builds/{% prompt ''Build ID'',
+      ''myBuildId'', ''Build ID'', '''', ''myBuildId'' %}/content-map'
+    name: GET /api/projects/{projectId}/game-builds/{gameBuildId}/content-map — 씬
+      명세 조회
+    meta:
+      id: req_orch_contentmap_read
+      created: 1787000001000
+      modified: 1787000001000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration
+
+
+        **동작**: 이 빌드에 앉은 씬 명세를 한 번에 읽는다. content_map 을 프로덕션에서 읽는 유일한 경로다.
+
+
+        **Request**
+
+        - `projectId`, `gameBuildId` (path)
+
+        - `capture` (query, 선택): editor · editor-play · player. 생략하면 가장 최근에 알게 된 capture.
+        명시하면 폴백하지 않는다 — player 를 물었는데 editor 를 내주면 화면이 authoring 값을 post-play 값으로
+        그린다.
+
+
+        **Response**
+
+        - `200`: `{ contentMap|null, scenes[], edges[], gaps[], verification, pendingDocuments[],
+        lastScan|null }`
+
+        - `contentMap` 이 null 이면 이 빌드는 한 번도 스캔되지 않았다
+
+        - `contentMap.ingestedAt` 이 null 이면 문서는 왔지만 아직 앉지 않았다
+
+        - `lastScan` 은 메모리에 있다(빌드당 1건, 256개 상한). 서버 재시작에 사라진다
+
+        - `400`: capture 가 어휘 밖 (invalid_capture)
+
+        - `404`: 빌드 없음 또는 경로 projectId 가 그 빌드의 것과 다름
+
+
+        근거: ARTEL-446 (PR #154)'
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
+  - url: '{{ _.stage_orch_base_url }}/api/projects/{% prompt ''Project ID'', ''myProjectId'',
+      ''Project ID'', '''', ''myProjectId'' %}/game-builds/{% prompt ''Build ID'',
+      ''myBuildId'', ''Build ID'', '''', ''myBuildId'' %}/content-map/scan'
+    name: POST /api/projects/{projectId}/game-builds/{gameBuildId}/content-map/scan
+      — 원격 근거 스캔 요청
+    meta:
+      id: req_orch_contentmap_scan
+      created: 1787000002000
+      modified: 1787000002000
+      isPrivate: false
+      description: '**호출 주체**: FE → Orchestration → SDK
+
+
+        **동작**: 붙어 있는 game instance 에 scan_evidence 액션을 보낸다. **기다리지 않는다** — 202 로
+        답하고, SDK 가 근거를 스캔해 /api/sdk/game-builds/{gameBuildId}/content-map 으로 스스로 올린
+        뒤 ACTION_RESULT 가 돌아오면 서버가 적재한다.
+
+
+        **Request**
+
+        - `projectId`, `gameBuildId` (path)
+
+        - 본문 없음
+
+
+        **Response**
+
+        - `202`: `{ gameInstanceId, gameInstanceName, state: "REQUESTED", requestedAt
+        }`
+
+        - `404`: 빌드 없음 또는 경로 projectId 불일치
+
+        - `409`: 붙어 있는 게임 인스턴스 없음 — 화면이 버튼을 비활성으로 두고 이유를 말할 수 있어야 하므로 404 와 가른다
+
+
+        **완료를 아는 법**: 이 응답만으로는 모른다. 위의 조회(GET)를 다시 불러 lastScan.state 와 contentMap.ingestedAt
+        이 움직이는 것을 본다. 적재가 실패하면 pendingDocuments[].ingestError 에, 스캔 자체가 실패하면 lastScan.error
+        에 사유가 남는다.
+
+
+        근거: ARTEL-492 (PR #156). SDK 쪽은 ARTEL-490 (PR #88) · ARTEL-491 (PR #89)'
+    method: POST
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+    authentication:
+      type: bearer
+      token: '{{ _.stage_orch_jwt }}'
 - name: Game Instance
   meta:
     id: fld_orch_gameinstance
