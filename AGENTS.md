@@ -37,3 +37,23 @@ For tracked Git work, follow:
 
 Use project-local skills when installed and applicable. Skill instructions
 define their own triggers, formats, and output paths.
+
+## Filling the token variable for the local sub-environment
+
+Every authenticated request in `orchestrator-server.yaml` reads its bearer token
+from `stage_orch_jwt`, and the `local` sub-environment points the collection at
+`http://localhost:8080`. No token is stored here — secrets stay out of this
+repository — so the variable is filled by hand each time.
+
+Against a local server, mint one rather than logging in through GitHub:
+
+```bash
+.claude/skills/artel-jwt/mint-jwt.py --sub <app_user.id> --ttl 8h
+```
+
+Paste the output into `stage_orch_jwt` in the `local` sub-environment. `--sub`
+must be an existing `app_user.id`. The `/api/sdk/**` requests need a different
+token (`--audience sdk`); the browser session is rejected there by design.
+
+The `artel-jwt` skill covers the rest. It mints for a local server only, so a
+stage token still comes from a real login.
