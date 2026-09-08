@@ -67,7 +67,7 @@ collection:
         - `user_input` (string, 필수): 만들고 싶은 시나리오에 대한 자연어 지시
         - `unity_context` (object, 선택): Unity 런타임에서 수집한 현재 게임 상태. 기본 `{}`
         - `game_context` (object, 선택): 기획서에서 추출한 게임 지식. `POST /internal/extract` 응답의 `game_context`를 그대로 넣는다. 기본 `{}`
-        - `model` (enum, 선택): 기본 `openai/gpt-4o-mini`. `openai/gpt-4o`, `anthropic/claude-sonnet-5`, `anthropic/claude-opus-4.8`, `google/gemini-2.5-flash`, `google/gemini-2.5-pro`, `google/gemma-4-31b-it:free`
+        - `model` (enum, 선택): 기본 `openai/gpt-5.6-luna`. `openai/gpt-5.6-sol`, `openai/gpt-chat-latest`, `anthropic/claude-sonnet-5`, `anthropic/claude-opus-5`, `google/gemini-3.7-flash`, `google/gemini-2.5-pro`, `google/gemma-4-31b-it:free`, `x-ai/grok-4.6`, `moonshotai/kimi-k3`, `z-ai/glm-5.3-flash`, `qwen/qwen3.8-max`
         - `language` (enum, 선택): 시나리오 출력 언어. 기본 `ko`. `ko`(한국어) | `en`(영어). 첫 턴을 포함한 세션 전체에 적용된다
 
         **Response**
@@ -84,7 +84,7 @@ collection:
           "user_input": "로그인 화면에서 잘못된 비밀번호를 입력하는 시나리오를 만들어줘",
           "unity_context": {},
           "game_context": {},
-          "model": "openai/gpt-4o-mini",
+          "model": "openai/gpt-5.6-luna",
           "language": "ko"
         }
     headers:
@@ -192,7 +192,7 @@ collection:
         **Request**
         - `source_url` (string, 필수): presigned GET URL
         - `filename` (string, 필수): 포맷 판별용 파일명. `.pdf` / `.txt` / `.md` 지원
-        - `model` (enum, 선택): 기본 `openai/gpt-4o-mini`. `openai/gpt-4o`, `anthropic/claude-sonnet-5`, `anthropic/claude-opus-4.8`, `google/gemini-2.5-flash`, `google/gemini-2.5-pro`, `google/gemma-4-31b-it:free`
+        - `model` (enum, 선택): 기본 `openai/gpt-5.6-luna`. `openai/gpt-5.6-sol`, `openai/gpt-chat-latest`, `anthropic/claude-sonnet-5`, `anthropic/claude-opus-5`, `google/gemini-3.7-flash`, `google/gemini-2.5-pro`, `google/gemma-4-31b-it:free`, `x-ai/grok-4.6`, `moonshotai/kimi-k3`, `z-ai/glm-5.3-flash`, `qwen/qwen3.8-max`
 
         **Response**
         - `200`: `{ source, metadata, game_context }`
@@ -212,7 +212,7 @@ collection:
         {
           "source_url": "{{ _.extract_source_url }}",
           "filename": "27760374-f913-481c-a2ab-27835cbe5c41.pdf",
-          "model": "openai/gpt-4o-mini"
+          "model": "openai/gpt-5.6-luna"
         }
     headers:
       - name: Content-Type
@@ -258,7 +258,7 @@ collection:
               {"step": 1, "title": "로그인 화면 진입", "state": "앱 실행됨", "action": "로그인 버튼 탭", "expected": "로그인 폼 표시"}
             ]
           },
-          "model": "openai/gpt-4o-mini",
+          "model": "openai/gpt-5.6-luna",
           "language": "en"
         }
         ```
@@ -304,7 +304,7 @@ collection:
 
         **Request**
         - `context` (object, 필수): `qa_try_id`, `game_instance_id`, `test_scenario_id` (모두 number), `scenario` (승인된 `{ title, description, steps[] }`. `steps[].step`은 1부터 연속)
-        - `model` (enum, 선택): 기본 `openai/gpt-4o-mini`
+        - `model` (enum, 선택): 기본 `openai/gpt-5.6-luna`
         - `language` (enum, 선택): 기본 `ko`. `ko` | `en`
         - `prompt_version` (string, 선택): `app/prompts/qa_run/` 아래 버전 디렉터리명. 생략하면 배포의 `QA_PROMPT_VERSION`, 그것도 없으면 최신
         - `reasoning` (object, 선택): 모델이 지원하지 않는 값이면 422. 다운그레이드하지 않는다
@@ -334,7 +334,7 @@ collection:
               ]
             }
           },
-          "model": "openai/gpt-4o-mini",
+          "model": "openai/gpt-5.6-luna",
           "language": "ko"
         }
     headers:
@@ -409,7 +409,7 @@ collection:
 
         **Request**
         - `items` (object[], 필수, 최소 1개): `{ id, summary, description }`. `id`는 그대로 돌려받는 불투명 값이라 순서에 기대지 않고 배치 응답을 맞출 수 있다
-        - `model` (enum, 선택): 기본 `openai/gpt-4o-mini`
+        - `model` (enum, 선택): 기본 `openai/gpt-5.6-luna`
         - `project_id` (number, 선택): LLM 지출 귀속 대상
 
         **Response**
@@ -430,7 +430,7 @@ collection:
               "description": "골드가 부족하면 구매 버튼이 비활성화되고 안내 문구가 뜬다."
             }
           ],
-          "model": "openai/gpt-4o-mini",
+          "model": "openai/gpt-5.6-luna",
           "project_id": 1
         }
     headers:
